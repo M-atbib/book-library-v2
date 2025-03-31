@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // User document rules
+    match /users/{userId} {
+      // Allow read/write if the user is accessing their own document
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow create only if:
+      // 1. User is authenticated
+      // 2. The document ID matches their auth ID
+      // 3. They're creating their own document
+      allow create: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasAll(['user_name', 'email', 'role', 'savedBookIds'])
+        && request.resource.data.email is string
+        && request.resource.data.role in ['author', 'reader']
+        && request.resource.data.savedBookIds is list;
+    }
+    
+    // Books collection rules
+    match /books/{bookId} {
+      // Only allow public reading of published books
+      allow read: if request.auth != null ;
+    
+      // Only authors can create books
+      allow create: if request.auth != null && 
+                    request.resource.data.authorId == request.auth.uid &&
+                    request.auth.token.role == 'author' &&
+                    isValidBook();
+      
+      // Authors can only update or delete their own books
+      allow update, delete: if request.auth != null && 
+                           resource.data.authorId == request.auth.uid;
+      
+      // Rating subcollection - readers can rate books
+      match /ratings/{ratingId} {
+       allow read: if request.auth != null ;
+        
+        // Users can only create or update their own ratings
+        allow create, update: if request.auth != null &&
+                              request.resource.data.userId == request.auth.uid &&
+                              request.auth.token.role == 'reader' &&
+                              isValidRating();
+        
+        // Users can only delete their own ratings
+        allow delete: if request.auth != null && 
+                      resource.data.userId == request.auth.uid;
+      }
+    }
+    
+    // Helper functions
+    function isValidBook() {
+      let book = request.resource.data;
+      return book.keys().hasAll(['title', 'authorId', 'publishedDate', 'genre', 'pages', 'description']) &&
+             book.title is string && book.title.size() > 0 &&
+             book.authorId is string && book.authorId.size() > 0 &&
+             book.publishedDate is timestamp &&
+             book.genre is string && book.genre.size() > 0 &&
+             book.pages is number && book.pages > 0 &&
+             book.description is string &&
+             (!book.keys().hasAny(['tags']) || book.tags is list);
+    }
+    
+    function isValidRating() {
+      let rating = request.resource.data;
+      return rating.keys().hasAll(['userId', 'ratingValue']) &&
+             rating.userId is string &&
+             rating.ratingValue is number && 
+             rating.ratingValue >= 1 && 
+             rating.ratingValue <= 5;
+    }
+  }
+}

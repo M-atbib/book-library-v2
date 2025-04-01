@@ -86,7 +86,7 @@ service cloud.firestore {
              book.publishedDate is timestamp &&
              book.genre is string && book.genre.size() > 0 &&
              book.numberOfPages is number && book.numberOfPages > 0 &&
-             book.tags is list && book.tags.all(tag => tag is string) &&
+             book.tags is list && book.tags.size() > 0 && book.tags.size() < 20 &&
              book.createdAt is timestamp &&
              book.updatedAt is timestamp;
     }

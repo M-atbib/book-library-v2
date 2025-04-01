@@ -22,12 +22,7 @@ const config = {
 		})
 	},
 	alias: {
-		$lib: './src/lib',
-		$components: './src/lib/components',
-		$types: './src/lib/types',
-		$utils: './src/lib/utils',
-		$services: './src/lib/services',
-		$features: './src/lib/features'
+		$lib: './src/lib/*',
 	}
 };
 

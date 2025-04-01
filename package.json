@@ -27,6 +27,7 @@
 		"vite": "^6.0.0"
 	},
 	"dependencies": {
+		"@lucide/svelte": "^0.486.0",
 		"firebase": "^11.6.0"
 	}
 }

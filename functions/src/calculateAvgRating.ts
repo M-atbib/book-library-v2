@@ -70,25 +70,48 @@ export const calculateAvgRating = firestoreFunctions.onDocumentWritten(
 
       console.log(`Updated avgRating for book ${bookId} to ${newAvgRating}`);
 
-      // Update all savedBooks references in user collections
-      const savedBooksQuery = db
-        .collectionGroup("savedBooks")
-        .where("id", "==", bookId);
-      const savedBooksSnapshot = await savedBooksQuery.get();
-
-      if (!savedBooksSnapshot.empty) {
+      // Then update savedBooks by querying users collection
+      try {
+        // Get all users
+        const usersSnapshot = await db.collection("users").get();
         const batch = db.batch();
+        let operationsCount = 0;
+        const MAX_BATCH = 100;
+        const batches = [];
 
-        savedBooksSnapshot.forEach((doc) => {
-          batch.update(doc.ref, {
-            avgRating: newAvgRating,
-          });
-        });
+        for (const userDoc of usersSnapshot.docs) {
+          const savedBookRef = db
+            .collection("users")
+            .doc(userDoc.id)
+            .collection("savedBooks")
+            .doc(bookId);
 
-        await batch.commit();
-        console.log(
-          `Updated avgRating in ${savedBooksSnapshot.size} savedBooks references`
-        );
+          const savedBook = await savedBookRef.get();
+
+          if (savedBook.exists) {
+            if (operationsCount >= MAX_BATCH) {
+              batches.push(batch.commit());
+              operationsCount = 0;
+            }
+
+            batch.update(savedBookRef, {
+              avgRating: newAvgRating,
+            });
+            operationsCount++;
+          }
+        }
+
+        if (operationsCount > 0) {
+          batches.push(batch.commit());
+        }
+
+        if (batches.length > 0) {
+          await Promise.all(batches);
+          console.log(`Updated savedBooks references successfully`);
+        }
+      } catch (error) {
+        console.error("Error updating savedBooks:", error);
+        // Continue execution even if savedBooks update fails
       }
 
       return {

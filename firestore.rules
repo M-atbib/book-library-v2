@@ -64,9 +64,13 @@ service cloud.firestore {
     }
 
     function isValidSavedBook() {
-      return request.resource.data.keys().hasAll(['savedBooks', 'createdAt']) &&
-            request.resource.data.savedBooks is string &&
-            request.resource.data.createdAt is timestamp;
+      return request.resource.data.keys().hasAll(['title', 'authorName', 'coverUrl', 'genre', 'avgRating', 'tags']) &&
+            request.resource.data.title is string &&
+            request.resource.data.authorName is string &&
+            request.resource.data.coverUrl is string &&
+            request.resource.data.genre is string &&
+            request.resource.data.avgRating is number &&
+            request.resource.data.tags is list;
     }
 
     function isValidBook() {
@@ -91,12 +95,11 @@ service cloud.firestore {
     
     function isValidRating() {
       let rating = request.resource.data;
-      return rating.keys().hasAll(['userId', 'rating', 'createdAt']) &&
+      return rating.keys().hasAll(['userId', 'ratingValue']) &&
          rating.userId == request.auth.uid &&
-         rating.rating is number && 
-         rating.rating >= 1 && 
-         rating.rating <= 5 &&
-         rating.createdAt is timestamp;
+         rating.ratingValue is number && 
+         rating.ratingValue >= 1 && 
+         rating.ratingValue <= 5;
     }
   }
 }

@@ -16,6 +16,7 @@ import {
   query,
   setDoc,
   startAfter,
+  deleteDoc,
 } from "firebase/firestore";
 import { handleError } from "$lib/utils/errorHandling";
 import { auth } from "$lib/services/firebase";
@@ -31,7 +32,9 @@ interface Pagination {
 
 export class BookState {
   books = $state<Book[]>([]);
+  book = $state<RatedBook | null>(null);
   totalBooks = $state<number>(0);
+  isBookSaved = $state<boolean>(false);
   pagination = $state<Pagination>({
     currentPage: 1,
     totalPages: 0,
@@ -121,7 +124,7 @@ export class BookState {
     }
   }
 
-  async fetchBookById(id: string): Promise<RatedBook | null> {
+  async fetchBookById(id: string) {
     try {
       this.loading = true;
       this.error = null;
@@ -155,9 +158,22 @@ export class BookState {
             userId: currentUser.uid,
           };
         }
+
+        // Check if book is saved by the user
+        const savedBookRef = doc(
+          db,
+          "users",
+          currentUser.uid,
+          "savedBooks",
+          id
+        );
+        const savedBookDoc = await getDoc(savedBookRef);
+        this.isBookSaved = savedBookDoc.exists();
+      } else {
+        this.isBookSaved = false;
       }
 
-      return {
+      this.book = {
         book,
         rating: rating || { ratingValue: 0, userId: "" },
       };
@@ -181,18 +197,6 @@ export class BookState {
         return false;
       }
 
-      // Create SavedBook object with only the required fields
-      const savedBook: SavedBook = {
-        id: book.id,
-        title: book.title,
-        authorName: book.authorName,
-        coverUrl: book.coverUrl,
-        avgRating: book.avgRating,
-        genre: book.genre,
-        tags: book.tags,
-      };
-
-      // Save to user's saved books subcollection
       const savedBookRef = doc(
         db,
         "users",
@@ -200,12 +204,33 @@ export class BookState {
         "savedBooks",
         book.id
       );
-      await setDoc(savedBookRef, savedBook);
+
+      // Toggle save/unsave based on current state
+      if (this.isBookSaved) {
+        // Unsave the book
+        await deleteDoc(savedBookRef);
+        this.isBookSaved = false;
+      } else {
+        // Create SavedBook object with only the required fields
+        const savedBook: SavedBook = {
+          id: book.id,
+          title: book.title,
+          authorName: book.authorName,
+          coverUrl: book.coverUrl,
+          avgRating: book.avgRating,
+          genre: book.genre,
+          tags: book.tags,
+        };
+
+        // Save to user's saved books subcollection
+        await setDoc(savedBookRef, savedBook);
+        this.isBookSaved = true;
+      }
 
       return true;
     } catch (error) {
       this.error = handleError(error).message;
-      console.error("Error saving book:", error);
+      console.error("Error saving/unsaving book:", error);
       return false;
     } finally {
       this.loading = false;
@@ -240,9 +265,42 @@ export class BookState {
 
       // Check if user has already rated this book
       const ratingRef = doc(db, "books", bookId, "ratings", currentUser.uid);
+      const ratingDoc = await getDoc(ratingRef);
+      const previousRating = ratingDoc.exists()
+        ? (ratingDoc.data() as BookRating).ratingValue
+        : 0;
 
       // Save rating to book's ratings subcollection
       await setDoc(ratingRef, bookRating);
+
+      // Update the avgRating reactively in the UI without waiting for cloud function
+      if (this.book && this.book.book.id === bookId) {
+        // Calculate new average rating
+        const currentAvgRating = this.book.book.avgRating || 0;
+        let newAvgRating;
+
+        if (currentAvgRating === 0) {
+          // First rating
+          newAvgRating = rating;
+        } else if (previousRating > 0) {
+          // User is updating their previous rating
+          // Simple approach: adjust the average by removing old rating and adding new one
+          // This is a simplified calculation for UI reactivity only
+          newAvgRating = currentAvgRating - previousRating / 2 + rating / 2;
+        } else {
+          // New rating from this user
+          newAvgRating = (currentAvgRating + rating) / 2;
+        }
+
+        // Update the book's avgRating in the local state
+        this.book.book.avgRating = newAvgRating;
+
+        // Also update in the books list if present
+        const bookIndex = this.books.findIndex((b) => b.id === bookId);
+        if (bookIndex !== -1) {
+          this.books[bookIndex].avgRating = newAvgRating;
+        }
+      }
 
       return true;
     } catch (error) {

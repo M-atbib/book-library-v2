@@ -133,5 +133,5 @@
 
   <div class="divider">OR</div>
 
-  <GoogleButton {role} />
+  <GoogleButton {role} {isRegistration} />
 </form>

@@ -1,5 +1,8 @@
 <script lang="ts">
-    import type { PageData } from './$types';
+  import Tabs from "$lib/features/profile/components/Tabs.svelte";
+  import { setProfileState } from "$lib/features/profile/context/profile.svelte";
 
-    let { data }: { data: PageData } = $props();
+  setProfileState();
 </script>
+
+<Tabs />

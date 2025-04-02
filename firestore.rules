@@ -22,12 +22,13 @@ service cloud.firestore {
       // Only allow public reading of published books
       allow read: if isSignedIn();
     
-      // Only authors can create books
-      allow create, update: if isSignedIn() && isAuthor() && request.resource.data.authorId == request.auth.uid && isValidBook();
-      allow delete: if isSignedIn() && isAuthor();
+      // Only authenticated users can create books
+      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid && isValidBook();
+      allow update: if isSignedIn() && isAuthor() && resource.data.authorId == request.auth.uid && isValidBook();
+      allow delete: if isSignedIn() && isAuthor() && resource.data.authorId == request.auth.uid;
       
       // Rating subcollection - readers can rate books
-      match /ratings/{ratingId} {
+      match /ratings/{ratingId} { 
         allow read: if isSignedIn();
         
         // Users can only create or update their own ratings
@@ -76,21 +77,19 @@ service cloud.firestore {
     function isValidBook() {
       let book = request.resource.data;
       return book.keys().hasAll([
-        'title', 'description', 'coverUrl', 'authorId', 'authorName', 
-        'publishedDate', 'genre', 'numberOfPages', 'tags', 
-        'avgRating', 'ratingCount', 'createdAt', 'updatedAt'
+        'title', 'authorName', 'authorId', 'coverUrl', 
+        'genre', 'tags', 'publishedDate', 'description', 'pages', 'avgRating'
       ]) &&
              book.title is string && book.title.size() > 0 &&
-             book.description is string &&
-             book.coverUrl is string &&
-             book.authorId is string && book.authorId.size() > 0 &&
              book.authorName is string && book.authorName.size() > 0 &&
-             book.publishedDate is timestamp &&
+             book.authorId is string && book.authorId.size() > 0 &&
+             book.coverUrl is string &&
              book.genre is string && book.genre.size() > 0 &&
-             book.numberOfPages is number && book.numberOfPages > 0 &&
-             book.tags is list && book.tags.size() > 0 && book.tags.size() < 20 &&
-             book.createdAt is timestamp &&
-             book.updatedAt is timestamp;
+             book.tags is list &&
+             book.publishedDate is timestamp &&
+             book.description is string &&
+             book.pages is number && book.pages > 0 &&
+             book.avgRating is number;
     }
     
     function isValidRating() {

@@ -4,7 +4,7 @@
   import { onMount } from "svelte";
   // @ts-ignore
   import PublishNewBook from "./PublishNewBook.svelte";
-  import { Trash2 } from "@lucide/svelte";
+  import { Trash2, X } from "@lucide/svelte";
 
   const profileState = getProfileState();
 
@@ -21,6 +21,10 @@
       await profileState.deleteBook(bookId);
     }
   }
+
+  function clearError() {
+    profileState.error = null;
+  }
 </script>
 
 <div class="w-full">
@@ -29,13 +33,18 @@
     <PublishNewBook />
   </div>
 
+  {#if profileState.error}
+    <div class="alert alert-error mb-4 flex justify-between">
+      <span>{profileState.error}</span>
+      <button class="btn btn-ghost btn-sm" onclick={clearError}>
+        <X size={18} />
+      </button>
+    </div>
+  {/if}
+
   {#if profileState.loading}
     <div class="flex justify-center my-8">
       <span class="loading loading-spinner loading-lg"></span>
-    </div>
-  {:else if profileState.error}
-    <div class="alert alert-error mb-4">
-      <span>{profileState.error}</span>
     </div>
   {:else if profileState.publishedBooks.length === 0}
     <div class="alert alert-info">

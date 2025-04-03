@@ -12,6 +12,10 @@
   function loadMoreBooks() {
     profileState.fetchSavedBooks(true);
   }
+
+  function handleRemoveSaved(bookId: string) {
+    profileState.removeSavedBook(bookId);
+  }
 </script>
 
 <div class="container mx-auto p-4">
@@ -34,7 +38,7 @@
       class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
     >
       {#each profileState.savedBooks as book (book.id)}
-        <BookCard {book} />
+        <BookCard {book} onRemoveSaved={handleRemoveSaved} isSaved={true} />
       {/each}
     </div>
 

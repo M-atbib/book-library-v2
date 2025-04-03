@@ -67,33 +67,64 @@ export const syncAuthorName = firestoreFunctions.onDocumentUpdated(
       await booksBatch.commit();
       console.log(`Updated authorName in ${booksSnapshot.size} books`);
 
-      // Update all savedBooks references
-      const savedBooksQuery = db
-        .collectionGroup("savedBooks")
-        .where("authorId", "==", userId);
-      const savedBooksSnapshot = await savedBooksQuery.get();
+      // Update all savedBooks references by querying all users
+      try {
+        // Get all users
+        const usersSnapshot = await db.collection("users").get();
+        let updatedSavedBooksCount = 0;
 
-      if (!savedBooksSnapshot.empty) {
-        const savedBooksBatch = db.batch();
+        // Process users in batches to avoid memory issues
+        const batchPromises = [];
+        let batch = db.batch();
+        let batchCount = 0;
 
-        savedBooksSnapshot.forEach((doc) => {
-          savedBooksBatch.update(doc.ref, {
-            authorName: newAuthorName,
-          });
-        });
+        for (const userDoc of usersSnapshot.docs) {
+          // For each user, check their savedBooks collection for books by this author
+          const savedBooksRef = db
+            .collection("users")
+            .doc(userDoc.id)
+            .collection("savedBooks");
 
-        await savedBooksBatch.commit();
+          const savedBooksSnapshot = await savedBooksRef
+            .where("authorId", "==", userId)
+            .get();
+
+          if (!savedBooksSnapshot.empty) {
+            for (const doc of savedBooksSnapshot.docs) {
+              batch.update(doc.ref, {
+                authorName: newAuthorName,
+              });
+
+              batchCount++;
+              updatedSavedBooksCount++;
+
+              // Commit batch when it reaches the maximum size
+              if (batchCount >= 100) {
+                batchPromises.push(batch.commit());
+                batch = db.batch();
+                batchCount = 0;
+              }
+            }
+          }
+        }
+
+        // Commit any remaining updates
+        if (batchCount > 0) {
+          await batch.commit();
+        }
+
         console.log(
-          `Updated authorName in ${savedBooksSnapshot.size} savedBooks references`
+          `Updated authorName in ${updatedSavedBooksCount} savedBooks references`
         );
-      }
 
-      return {
-        success: true,
-        message: `Successfully synced author name to ${newAuthorName} across ${
-          booksSnapshot.size
-        } books and ${savedBooksSnapshot.size || 0} saved references`,
-      };
+        return {
+          success: true,
+          message: `Successfully synced author name to ${newAuthorName} across ${booksSnapshot.size} books and ${updatedSavedBooksCount} saved references`,
+        };
+      } catch (error) {
+        console.error("Error updating savedBooks:", error);
+        throw error; // Throw error to trigger function retry
+      }
     } catch (error) {
       console.error("Error syncing author name:", error);
       return {

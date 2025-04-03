@@ -7,8 +7,17 @@ import {
   signInWithEmailAndPassword,
   signOut,
   type User as FirebaseUser,
+  updateProfile,
+  updateEmail,
+  updatePassword,
 } from "firebase/auth";
-import { doc, serverTimestamp, setDoc, Timestamp } from "firebase/firestore";
+import {
+  doc,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { getDoc } from "firebase/firestore";
 import { getContext } from "svelte";
 import { setContext } from "svelte";
@@ -23,6 +32,7 @@ export class UserSate {
   user = $state<User | null>(null);
   role = $state<string>("");
   error = $state<string | null>(null);
+  loading = $state<boolean>(false);
 
   setUser(user: User) {
     this.user = user;
@@ -142,6 +152,55 @@ export class UserSate {
     } catch (error) {
       console.error("Error logging out:", error);
       throw error;
+    }
+  }
+
+  async updateInfo(email: string, displayName: string, password?: string) {
+    if (!auth.currentUser) {
+      this.error = "User not authenticated";
+      return;
+    }
+
+    try {
+      this.loading = true;
+      this.error = null;
+
+      const userId = auth.currentUser.uid;
+      const userRef = doc(db, "users", userId);
+
+      // Update user document in Firestore
+      await updateDoc(userRef, {
+        email,
+        displayName,
+        updatedAt: new Date(),
+      });
+
+      if (displayName !== auth.currentUser.displayName) {
+        await updateProfile(auth.currentUser, {
+          displayName: displayName,
+        });
+      }
+
+      // Update Firebase Auth email if changed
+      if (email !== auth.currentUser.email) {
+        await updateEmail(auth.currentUser, email);
+      }
+
+      // Update password if provided
+      if (password && password.trim() !== "") {
+        await updatePassword(auth.currentUser, password);
+      }
+      this.user = {
+        uid: userId,
+        email,
+        displayName,
+        createdAt: this.user?.createdAt || (serverTimestamp() as Timestamp),
+        updatedAt: serverTimestamp() as Timestamp,
+      };
+    } catch (error) {
+      this.error = handleError(error).message;
+    } finally {
+      this.loading = false;
     }
   }
 }

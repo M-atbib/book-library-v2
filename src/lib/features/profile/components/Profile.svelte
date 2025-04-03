@@ -1,9 +1,8 @@
 <script lang="ts">
-  import { getProfileState } from "$lib/features/profile/context/profile.svelte";
+  import { getUserState } from "$lib/features/auth/context/auth.svelte";
   import { auth } from "$lib/services/firebase";
 
-  const profileState = getProfileState();
-
+  const userState = getUserState();
   let email = $state(auth.currentUser?.email || "");
   let displayName = $state(auth.currentUser?.displayName || "");
   let password = $state("");
@@ -42,10 +41,10 @@
 
     if (!isFormValid) return;
 
-    await profileState.updateInfo(email, displayName, password);
+    await userState.updateInfo(email, displayName, password);
 
     // Reset password field after update
-    if (profileState.error === null) {
+    if (userState.error === null) {
       password = "";
     }
   }
@@ -55,11 +54,11 @@
   <div class="card-body">
     <h2 class="card-title mb-4">My Profile</h2>
 
-    {#if profileState.error}
-      <div class="alert alert-error mb-4">{profileState.error}</div>
+    {#if userState.error}
+      <div class="alert alert-error mb-4">{userState.error}</div>
     {/if}
 
-    <form class="space-y-4" on:submit={handleSubmit}>
+    <form class="space-y-4" onsubmit={handleSubmit}>
       <div class="form-control">
         <label class="label" for="email">
           <span class="label-text">Email</span>
@@ -124,9 +123,9 @@
         <button
           type="submit"
           class="btn btn-primary"
-          disabled={!isFormValid || profileState.loading}
+          disabled={!isFormValid || userState.loading}
         >
-          {profileState.loading ? "Updating..." : "Update Profile"}
+          {userState.loading ? "Updating..." : "Update Profile"}
         </button>
       </div>
     </form>

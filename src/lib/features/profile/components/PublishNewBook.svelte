@@ -227,6 +227,7 @@
           id="publishedDate"
           class="input input-bordered w-full"
           bind:value={book.publishedDate}
+          required
         />
       </div>
 

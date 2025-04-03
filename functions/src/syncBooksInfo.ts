@@ -48,9 +48,10 @@ export const syncBooksInfo = firestoreFunctions.onDocumentUpdated(
       });
 
       // Query all savedBooks references that match this book ID
+      // The document ID of savedBooks is the same as the book ID
       const savedBooksQuery = db
         .collectionGroup("savedBooks")
-        .where("id", "==", bookId);
+        .where(admin.firestore.FieldPath.documentId(), "==", bookId);
 
       const savedBooksSnapshot = await savedBooksQuery.get();
 
@@ -63,7 +64,8 @@ export const syncBooksInfo = firestoreFunctions.onDocumentUpdated(
       const batch = db.batch();
 
       savedBooksSnapshot.forEach((doc) => {
-        batch.update(doc.ref, updateData);
+        // Verify document still exists
+        batch.update(doc.ref, updateData, { exists: true }); // Add precondition
       });
 
       await batch.commit();

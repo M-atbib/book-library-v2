@@ -23,8 +23,7 @@ service cloud.firestore {
       allow read: if isSignedIn();
     
       // Only authenticated users can create books
-      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid && isValidBook();
-      allow update: if isSignedIn() && isAuthor() && resource.data.authorId == request.auth.uid && isValidBook();
+      allow create, update: if isSignedIn() && request.resource.data.authorId == request.auth.uid && isValidBook();
       allow delete: if isSignedIn() && isAuthor() && resource.data.authorId == request.auth.uid;
       
       // Rating subcollection - readers can rate books
@@ -37,6 +36,10 @@ service cloud.firestore {
         // Users can only delete their own ratings
         allow delete: if isSignedIn() && isReader() && resource.data.userId == request.auth.uid;
       }
+    }
+    
+    match /{document=**}/savedBooks/{savedBook} {
+      allow read, write: if isSignedIn() ;
     }
     
     // Helper functions

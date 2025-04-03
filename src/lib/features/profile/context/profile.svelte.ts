@@ -13,13 +13,12 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  writeBatch,
 } from "firebase/firestore";
-import { updateEmail, updatePassword, updateProfile } from "firebase/auth";
 import { handleError } from "$lib/utils/errorHandling";
 import { getContext } from "svelte";
 import { setContext } from "svelte";
 import { toFirestoreTimestamp } from "$lib/utils/dateFormatting";
+import type { UserRole } from "$lib/types/user.type";
 
 interface Pagination {
   currentPage: number;
@@ -35,6 +34,7 @@ export class ProfileState {
   publishedBooks = $state<Book[]>([]);
   loading = $state<boolean>(false);
   error = $state<string | null>(null);
+  role = $state<UserRole | null>(null);
   savedBooksPagination = $state<Pagination>({
     currentPage: 1,
     totalPages: 0,
@@ -176,6 +176,7 @@ export class ProfileState {
         const bookData = doc.data() as Book;
         books.push({
           ...bookData,
+          id: doc.id,
         });
       });
 
@@ -200,48 +201,6 @@ export class ProfileState {
     }
   }
 
-  async updateInfo(email: string, displayName: string, password?: string) {
-    if (!auth.currentUser) {
-      this.error = "User not authenticated";
-      return;
-    }
-
-    try {
-      this.loading = true;
-      this.error = null;
-
-      const userId = auth.currentUser.uid;
-      const userRef = doc(db, "users", userId);
-
-      // Update user document in Firestore
-      await updateDoc(userRef, {
-        email,
-        displayName,
-        updatedAt: new Date(),
-      });
-
-      if (displayName !== auth.currentUser.displayName) {
-        await updateProfile(auth.currentUser, {
-          displayName: displayName,
-        });
-      }
-
-      // Update Firebase Auth email if changed
-      if (email !== auth.currentUser.email) {
-        await updateEmail(auth.currentUser, email);
-      }
-
-      // Update password if provided
-      if (password && password.trim() !== "") {
-        await updatePassword(auth.currentUser, password);
-      }
-    } catch (error) {
-      this.error = handleError(error).message;
-    } finally {
-      this.loading = false;
-    }
-  }
-
   async publishBook(book: Omit<Book, "id">) {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
@@ -254,16 +213,18 @@ export class ProfileState {
 
       const booksRef = collection(db, "books");
 
-      // Ensure authorId is set to current user
-      const bookWithAuthorId = {
-        ...book,
+      // Prepare book data - explicitly omitting any potential id field
+      const { id, ...bookWithoutId } = book as any;
+
+      const bookData = {
+        ...bookWithoutId,
         avgRating: 0, // Initial rating for new book
         publishedDate: toFirestoreTimestamp(book.publishedDate),
       };
 
-      console.log(bookWithAuthorId);
-
-      const docRef = await addDoc(booksRef, bookWithAuthorId);
+      // Add document to Firestore - the ID will be automatically generated
+      // and not stored within the document itself
+      const docRef = await addDoc(booksRef, bookData);
 
       // Refresh published books
       await this.fetchPublishedBooks();
@@ -346,22 +307,88 @@ export class ProfileState {
         return false;
       }
 
-      // Update the book
+      // Check if user has author role as required by Firestore rules
+      const idTokenResult = await auth.currentUser.getIdTokenResult();
+      if (idTokenResult.claims.role !== "author") {
+        this.error = "Only authors can edit books";
+        return false;
+      }
+
+      // Validate book data according to Firestore rules
+      if (
+        !book.title ||
+        !book.authorName ||
+        !book.authorId ||
+        !book.genre ||
+        !book.publishedDate ||
+        !book.description ||
+        !Array.isArray(book.tags) ||
+        !book.pages ||
+        book.pages <= 0
+      ) {
+        this.error = "Invalid book data";
+        return false;
+      }
+
+      // Update the book with all required fields
       await updateDoc(bookRef, {
         title: book.title,
         authorName: book.authorName,
-        coverUrl: book.coverUrl,
+        authorId: book.authorId, // This should match the current user ID
+        coverUrl: book.coverUrl || "",
         genre: book.genre,
         tags: book.tags,
-        publishedDate: book.publishedDate,
+        publishedDate: toFirestoreTimestamp(book.publishedDate),
         description: book.description,
         pages: book.pages,
+        avgRating: book.avgRating,
       });
-
-      // Note: Cloud function will handle updating in savedBooks collections
 
       // Refresh published books
       await this.fetchPublishedBooks();
+
+      return true;
+    } catch (error) {
+      this.error = handleError(error).message;
+      return false;
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async getRole() {
+    if (!auth.currentUser) {
+      this.error = "User not authenticated";
+      return null;
+    }
+
+    try {
+      const idTokenResult = await auth.currentUser.getIdTokenResult();
+      this.role = idTokenResult.claims.role as UserRole;
+    } catch (error) {
+      this.error = handleError(error).message;
+      return null;
+    }
+  }
+
+  async removeSavedBook(bookId: string) {
+    if (!auth.currentUser) {
+      this.error = "User not authenticated";
+      return false;
+    }
+
+    try {
+      this.loading = true;
+      this.error = null;
+
+      const userId = auth.currentUser.uid;
+      const savedBookRef = doc(db, `users/${userId}/savedBooks`, bookId);
+
+      // Delete the document from the savedBooks subcollection
+      await deleteDoc(savedBookRef);
+
+      // Update the local state by removing the book
+      this.savedBooks = this.savedBooks.filter((book) => book.id !== bookId);
 
       return true;
     } catch (error) {

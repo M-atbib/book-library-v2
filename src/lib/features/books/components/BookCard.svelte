@@ -1,13 +1,22 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import type { Book } from "$lib/types/books.type";
-  import { Star } from "@lucide/svelte";
+  import type { Book, SavedBook } from "$lib/types/books.type";
+  import { Star, X } from "@lucide/svelte";
 
   interface BookCardProps {
-    book: Book;
+    book: Book | SavedBook;
+    isSaved?: boolean;
+    onRemoveSaved?: (bookId: string) => void;
   }
 
-  let { book }: BookCardProps = $props();
+  let { book, isSaved = false, onRemoveSaved }: BookCardProps = $props();
+
+  function handleRemove(event: MouseEvent) {
+    event.stopPropagation();
+    if (onRemoveSaved) {
+      onRemoveSaved(book.id);
+    }
+  }
 </script>
 
 <div
@@ -33,6 +42,15 @@
     <div class="absolute top-2 right-2">
       <span class="badge badge-neutral">{book.genre}</span>
     </div>
+    {#if isSaved}
+      <button
+        class="absolute top-2 left-2 bg-error text-white rounded-full p-1 hover:bg-error-focus"
+        onclick={handleRemove}
+        aria-label="Remove from saved books"
+      >
+        <X class="w-5 h-5" />
+      </button>
+    {/if}
   </figure>
 
   <div class="card-body p-4">
@@ -40,7 +58,10 @@
       <h2 class="card-title text-xl font-bold">{book.title}</h2>
       <div class="flex">
         {#each Array(5) as _, i}
-          <Star class="w-5 h-5" fill={i < Math.round(book.avgRating) ? "currentColor" : "none"} />
+          <Star
+            class="w-5 h-5"
+            fill={i < Math.round(book.avgRating) ? "currentColor" : "none"}
+          />
         {/each}
       </div>
     </div>

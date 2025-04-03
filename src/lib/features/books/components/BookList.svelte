@@ -5,7 +5,6 @@
   import { getBookState } from "../context/books.svelte";
 
   const bookState = getBookState();
-  console.log(bookState.books);
 </script>
 
 {#if bookState.loading}

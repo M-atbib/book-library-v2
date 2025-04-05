@@ -17,6 +17,8 @@ import {
   setDoc,
   startAfter,
   deleteDoc,
+  updateDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { handleError } from "$lib/utils/errorHandling";
 import { auth } from "$lib/services/firebase";
@@ -263,35 +265,48 @@ export class BookState {
         return false;
       }
 
+      const bookData = bookDoc.data();
+      const currentAvgRating = bookData.avgRating || 0;
+      const currentRatingCount = bookData.ratingCount || 0;
+
       // Check if user has already rated this book
       const ratingRef = doc(db, "books", bookId, "ratings", currentUser.uid);
       const ratingDoc = await getDoc(ratingRef);
-      const previousRating = ratingDoc.exists()
-        ? (ratingDoc.data() as BookRating).ratingValue
-        : 0;
+      const isNewRating = !ratingDoc.exists();
+      const previousRating = isNewRating
+        ? 0
+        : (ratingDoc.data() as BookRating).ratingValue;
 
       // Save rating to book's ratings subcollection
       await setDoc(ratingRef, bookRating);
 
-      // Update the avgRating reactively in the UI without waiting for cloud function
+      // Calculate new average rating
+      let newAvgRating;
+      let newRatingCount = currentRatingCount;
+
+      if (isNewRating) {
+        // This is a new rating, increment the count
+        newRatingCount = currentRatingCount + 1;
+        // Calculate new average: (avgRating * ratingCount + newRating) / (ratingCount + 1)
+        newAvgRating =
+          (currentAvgRating * currentRatingCount + rating) / newRatingCount;
+      } else {
+        // User is updating their previous rating
+        // Remove the previous rating and add the new one
+        newAvgRating =
+          (currentAvgRating * currentRatingCount - previousRating + rating) /
+          currentRatingCount;
+      }
+
+      // Update the book document with new average rating and count
+      await updateDoc(bookRef, {
+        avgRating: newAvgRating,
+        ratingCount: newRatingCount,
+        updatedAt: serverTimestamp(),
+      });
+
+      // Update the avgRating reactively in the UI
       if (this.book && this.book.book.id === bookId) {
-        // Calculate new average rating
-        const currentAvgRating = this.book.book.avgRating || 0;
-        let newAvgRating;
-
-        if (currentAvgRating === 0) {
-          // First rating
-          newAvgRating = rating;
-        } else if (previousRating > 0) {
-          // User is updating their previous rating
-          // Simple approach: adjust the average by removing old rating and adding new one
-          // This is a simplified calculation for UI reactivity only
-          newAvgRating = currentAvgRating - previousRating / 2 + rating / 2;
-        } else {
-          // New rating from this user
-          newAvgRating = (currentAvgRating + rating) / 2;
-        }
-
         // Update the book's avgRating in the local state
         this.book.book.avgRating = newAvgRating;
 

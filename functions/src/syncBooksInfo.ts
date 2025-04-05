@@ -47,36 +47,54 @@ export const syncBooksInfo = firestoreFunctions.onDocumentUpdated(
         }
       });
 
-      // Query all savedBooks references that match this book ID
-      // The document ID of savedBooks is the same as the book ID
-      const savedBooksQuery = db
-        .collectionGroup("savedBooks")
-        .where(admin.firestore.FieldPath.documentId(), "==", bookId);
+      // Get all users
+      const usersSnapshot = await db.collection("users").get();
+      let updatedSavedBooksCount = 0;
 
-      const savedBooksSnapshot = await savedBooksQuery.get();
+      // Process users in batches to avoid memory issues
+      const batchPromises = [];
+      let batch = db.batch();
+      let batchCount = 0;
 
-      if (savedBooksSnapshot.empty) {
-        console.log(`No savedBooks references found for book ${bookId}`);
-        return null;
+      for (const userDoc of usersSnapshot.docs) {
+        // For each user, check if they have this book in their savedBooks collection
+        const savedBookRef = db
+          .collection("users")
+          .doc(userDoc.id)
+          .collection("savedBooks")
+          .doc(bookId);
+
+        const savedBookDoc = await savedBookRef.get();
+
+        if (savedBookDoc.exists) {
+          batch.update(savedBookRef, updateData);
+          batchCount++;
+          updatedSavedBooksCount++;
+
+          // Commit batch when it reaches the maximum size
+          if (batchCount >= 100) {
+            batchPromises.push(batch.commit());
+            batch = db.batch();
+            batchCount = 0;
+          }
+        }
       }
 
-      // Update all savedBooks references in a batch
-      const batch = db.batch();
+      // Commit any remaining updates
+      if (batchCount > 0) {
+        batchPromises.push(batch.commit());
+      }
 
-      savedBooksSnapshot.forEach((doc) => {
-        // Verify document still exists
-        batch.update(doc.ref, updateData, { exists: true }); // Add precondition
-      });
-
-      await batch.commit();
+      // Wait for all batch operations to complete
+      await Promise.all(batchPromises);
 
       console.log(
-        `Updated ${savedBooksSnapshot.size} savedBooks references for book ${bookId}`
+        `Updated ${updatedSavedBooksCount} savedBooks references for book ${bookId}`
       );
 
       return {
         success: true,
-        message: `Successfully synced book information across ${savedBooksSnapshot.size} savedBooks references`,
+        message: `Successfully synced book information across ${updatedSavedBooksCount} savedBooks references`,
         updatedFields: Object.keys(updateData),
       };
     } catch (error) {

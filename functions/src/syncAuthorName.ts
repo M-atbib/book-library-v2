@@ -86,7 +86,7 @@ export const syncAuthorName = firestoreFunctions.onDocumentUpdated(
             .collection("savedBooks");
 
           const savedBooksSnapshot = await savedBooksRef
-            .where("authorId", "==", userId)
+            .where("authorName", "==", beforeData.displayName)
             .get();
 
           if (!savedBooksSnapshot.empty) {
@@ -110,8 +110,11 @@ export const syncAuthorName = firestoreFunctions.onDocumentUpdated(
 
         // Commit any remaining updates
         if (batchCount > 0) {
-          await batch.commit();
+          batchPromises.push(batch.commit());
         }
+
+        // IMPORTANT: Wait for all batch operations to complete
+        await Promise.all(batchPromises);
 
         console.log(
           `Updated authorName in ${updatedSavedBooksCount} savedBooks references`

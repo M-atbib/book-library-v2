@@ -1,16 +1,14 @@
 <script lang="ts">
   import "../app.css";
-  import {
-    setUserState,
-    getUserState,
-  } from "$lib/features/auth/context/auth.svelte";
+  import { setUserState } from "$lib/features/auth/context/auth.svelte";
   import { checkRouteAccess } from "$lib/utils/routeProtection";
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { auth } from "$lib/services/firebase";
-  import { checkActionCode, type User } from "firebase/auth";
+  import { type User } from "firebase/auth";
   import { serverTimestamp, type Timestamp } from "firebase/firestore";
   import { Navbar } from "$lib/components";
+  import { initializeErrorTracking } from "$lib/services/bugsnag";
 
   const userState = setUserState();
   let { children } = $props();
@@ -18,6 +16,8 @@
   let checkingAuth = $state(true);
 
   onMount(() => {
+    console.log("Mounting layout");
+    initializeErrorTracking();
     const unsubscribe = auth.onAuthStateChanged(
       async (authUser: User | null) => {
         if (authUser) {

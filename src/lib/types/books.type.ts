@@ -31,3 +31,4 @@ export interface RatedBook {
   book: Book;
   rating: BookRating;
 }
+

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getUserState } from "$lib/features/auth/context/auth.svelte";
+  import { getUserState } from "$lib/features";
   import { auth } from "$lib/services/firebase";
 
   const userState = getUserState();

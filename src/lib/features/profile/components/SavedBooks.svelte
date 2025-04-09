@@ -1,6 +1,5 @@
 <script lang="ts">
-  import BookCard from "$lib/features/books/components/BookCard.svelte";
-  import { getProfileState } from "$lib/features/profile/context/profile.svelte";
+  import { BookCard, getProfileState } from "$lib/features";
   import { onMount } from "svelte";
 
   const profileState = getProfileState();

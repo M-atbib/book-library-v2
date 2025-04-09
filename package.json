@@ -27,7 +27,13 @@
 		"vite": "^6.0.0"
 	},
 	"dependencies": {
+		"@bugsnag/browser-performance": "^2.12.0",
+		"@bugsnag/js": "^8.2.0",
 		"@lucide/svelte": "^0.486.0",
-		"firebase": "^11.6.0"
+		"dotenv": "^16.4.7",
+		"firebase": "^11.6.0",
+		"instantsearch.js": "^4.78.1",
+		"typesense": "^2.1.0-2",
+		"typesense-instantsearch-adapter": "^2.9.0"
 	}
 }

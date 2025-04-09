@@ -1,3 +1,11 @@
+/**
+ * Auth Context Module
+ *
+ * This module provides a Svelte context for managing authentication-related state and operations.
+ * It handles user authentication, registration, profile management, and role-based access control
+ * using Firebase Authentication and Firestore.
+ */
+
 import { auth, db } from "$lib/services/firebase";
 import type { User, UserRole } from "$lib/types/user.type";
 import {
@@ -28,16 +36,29 @@ import { goto } from "$app/navigation";
 
 const googleProvider = new GoogleAuthProvider();
 const setUserRoleFunction = httpsCallable(functions, "authCustomClaims");
+
+/**
+ * UserState class that manages all authentication-related state and operations
+ */
 export class UserSate {
   user = $state<User | null>(null);
   role = $state<string>("");
   error = $state<string | null>(null);
   loading = $state<boolean>(false);
 
+  /**
+   * Sets the current user
+   * @param user User object to set as current user
+   */
   setUser(user: User) {
     this.user = user;
   }
 
+  /**
+   * Creates a new user document in Firestore after registration
+   * @param user Firebase user object
+   * @param role User role to assign
+   */
   async createUserInFirestore(user: FirebaseUser, role: UserRole) {
     try {
       const userRef = doc(db, "users", user.uid);
@@ -58,6 +79,10 @@ export class UserSate {
     }
   }
 
+  /**
+   * Fetches the current user's data from Firestore
+   * @returns User object or null if not found
+   */
   async getUser() {
     try {
       if (!this.user) return null;
@@ -76,6 +101,10 @@ export class UserSate {
     }
   }
 
+  /**
+   * Retrieves the current user's role from Firebase Auth claims
+   * @returns User role or null if not authenticated
+   */
   async getRole() {
     try {
       const user = auth.currentUser;
@@ -89,6 +118,11 @@ export class UserSate {
     }
   }
 
+  /**
+   * Handles errors in a consistent way across auth operations
+   * @param error Error object
+   * @param context Description of where the error occurred
+   */
   private handleStateError(error: unknown, context: string) {
     const appError = handleError(error);
     this.error = appError.message;
@@ -96,6 +130,11 @@ export class UserSate {
     throw appError;
   }
 
+  /**
+   * Authenticates a user with email and password
+   * @param email User's email
+   * @param password User's password
+   */
   async loginWithEmailAndPassword(email: string, password: string) {
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -106,6 +145,12 @@ export class UserSate {
     }
   }
 
+  /**
+   * Registers a new user with email and password
+   * @param email User's email
+   * @param password User's password
+   * @param role User's role
+   */
   async registerWithEmailAndPassword(
     email: string,
     password: string,
@@ -125,6 +170,10 @@ export class UserSate {
     }
   }
 
+  /**
+   * Authenticates a user with Google OAuth
+   * @param role User's role (for new users)
+   */
   async loginWithGoogle(role: UserRole) {
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
@@ -145,6 +194,9 @@ export class UserSate {
     }
   }
 
+  /**
+   * Signs out the current user
+   */
   async logout() {
     try {
       await signOut(auth);
@@ -155,6 +207,12 @@ export class UserSate {
     }
   }
 
+  /**
+   * Updates the user's profile information
+   * @param email New email address
+   * @param displayName New display name
+   * @param password New password (optional)
+   */
   async updateInfo(email: string, displayName: string, password?: string) {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
@@ -205,12 +263,23 @@ export class UserSate {
   }
 }
 
+/**
+ * Symbol key for the user state context
+ */
 const USER_STATE_KEY = Symbol("USER_STATE");
 
+/**
+ * Creates and sets the user state context
+ * @returns UserState instance
+ */
 export function setUserState() {
   return setContext(USER_STATE_KEY, new UserSate());
 }
 
+/**
+ * Retrieves the user state from context
+ * @returns UserState instance
+ */
 export function getUserState() {
   return getContext<ReturnType<typeof setUserState>>(USER_STATE_KEY);
 }

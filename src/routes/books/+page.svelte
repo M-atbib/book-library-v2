@@ -1,55 +1,17 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import BookList from "$lib/features/books/components/BookList.svelte";
-  import {
-    setBookState,
-    getBookState,
-  } from "$lib/features/books/context/books.svelte";
-
-  // Initialize the book state context
-  setBookState();
-  const bookState = getBookState();
-  let displayedRange = `${bookState.pagination.currentPage}-${bookState.pagination.pageSize}`;
-
-  onMount(async () => {
-    // Fetch books from Firestore when component mounts
-    await bookState.fetchBooks();
-  });
-
-  // Function to load more books
-  async function loadMoreBooks() {
-    if (bookState.pagination.hasNextPage) {
-      await bookState.fetchBooks(true);
-    }
-  }
+  import { BookList, Facet } from "$lib/features";
 </script>
 
-<div class="container mx-auto px-4 py-8">
-  <div class="flex justify-between items-center mb-8">
-    {#if bookState.totalBooks > 0}
-      <p class="text-gray-600 font-medium">
-        {displayedRange} of {bookState.totalBooks}
-      </p>
-    {/if}
+<div class="mx-auto px-4 py-8">
+  <div class="flex flex-col md:flex-row gap-8">
+    <!-- Sidebar -->
+    <aside class="w-full md:w-64 flex-shrink-0">
+      <Facet />
+    </aside>
 
-    {#if bookState.pagination.hasNextPage}
-      <button
-        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-        onclick={loadMoreBooks}
-        disabled={bookState.loading}
-      >
-        {bookState.loading ? "Loading..." : "Load More"}
-      </button>
-    {/if}
+    <!-- Main content -->
+    <main class="flex-1">
+      <BookList />
+    </main>
   </div>
-
-  {#if bookState.error}
-    <div
-      class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
-    >
-      {bookState.error}
-    </div>
-  {/if}
-
-  <BookList />
 </div>

@@ -1,9 +1,7 @@
 <script lang="ts">
-  import { getProfileState } from "$lib/features/profile/context/profile.svelte";
+  import { getProfileState, PublishNewBook } from "$lib/features";
   import { formatDate } from "$lib/utils/dateFormatting";
   import { onMount } from "svelte";
-  // @ts-ignore
-  import PublishNewBook from "./PublishNewBook.svelte";
   import { Trash2, X } from "@lucide/svelte";
 
   const profileState = getProfileState();
@@ -42,11 +40,7 @@
     </div>
   {/if}
 
-  {#if profileState.loading}
-    <div class="flex justify-center my-8">
-      <span class="loading loading-spinner loading-lg"></span>
-    </div>
-  {:else if profileState.publishedBooks.length === 0}
+  {#if profileState.publishedBooks.length === 0}
     <div class="alert alert-info">
       <span>You haven't published any books yet.</span>
     </div>

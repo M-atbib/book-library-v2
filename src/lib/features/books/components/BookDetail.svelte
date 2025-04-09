@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getBookState } from "$lib/features/books/context/books.svelte";
+  import { getBookState } from "$lib/features";
   import { formatDate } from "$lib/utils/dateFormatting";
   import { BookmarkCheck, BookmarkPlus, Loader, Star } from "@lucide/svelte";
 

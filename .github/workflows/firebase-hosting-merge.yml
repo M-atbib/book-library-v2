@@ -12,12 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm ci
-      - run: npm run build
-      - run: |
-          echo "VITE_TYPESENSE_HOST=${{ secrets.VITE_TYPESENSE_HOST }}"
-          echo "VITE_TYPESENSE_PORT=${{ secrets.VITE_TYPESENSE_PORT }}"
-          echo "VITE_TYPESENSE_PROTOCOL=${{ secrets.VITE_TYPESENSE_PROTOCOL }}"
-          echo "VITE_BUGSNAG_API_KEY=${{ secrets.VITE_BUGSNAG_API_KEY }}"
+      - run: VITE_TYPESENSE_HOST=${{ secrets.VITE_TYPESENSE_HOST }} VITE_TYPESENSE_PORT=${{ secrets.VITE_TYPESENSE_PORT }} VITE_TYPESENSE_PROTOCOL=${{  secrets.VITE_TYPESENSE_PROTOCOL }} VITE_TYPESENSE_SEARCH_ONLY_API_KEY=${{ secrets.VITE_TYPESENSE_SEARCH_ONLY_API_KEY }} npm run build
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
@@ -27,7 +22,3 @@ jobs:
         env:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
           VITE_BUGSNAG_API_KEY: ${{ secrets.VITE_BUGSNAG_API_KEY }}
-          VITE_TYPESENSE_HOST: ${{ secrets.VITE_TYPESENSE_HOST }}
-          VITE_TYPESENSE_PORT: ${{ secrets.VITE_TYPESENSE_PORT }}
-          VITE_TYPESENSE_PROTOCOL: ${{ secrets.VITE_TYPESENSE_PROTOCOL }}
-          VITE_TYPESENSE_SEARCH_ONLY_API_KEY: ${{ secrets.VITE_TYPESENSE_SEARCH_ONLY_API_KEY }}

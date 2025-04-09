@@ -25,7 +25,7 @@
   let checkingAuth = $state(true);
 
   onMount(() => {
-    initializeErrorTracking();
+    // initializeErrorTracking();
     const unsubscribe = auth.onAuthStateChanged(
       async (authUser: User | null) => {
         if (authUser) {

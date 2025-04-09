@@ -13,6 +13,11 @@ jobs:
       - uses: actions/checkout@v4
       - run: npm ci
       - run: npm run build
+      - run: |
+          echo "VITE_TYPESENSE_HOST=${{ secrets.VITE_TYPESENSE_HOST }}"
+          echo "VITE_TYPESENSE_PORT=${{ secrets.VITE_TYPESENSE_PORT }}"
+          echo "VITE_TYPESENSE_PROTOCOL=${{ secrets.VITE_TYPESENSE_PROTOCOL }}"
+          echo "VITE_BUGSNAG_API_KEY=${{ secrets.VITE_BUGSNAG_API_KEY }}"
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

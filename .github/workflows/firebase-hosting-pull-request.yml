@@ -18,7 +18,7 @@ jobs:
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BOOK_LIBRARY_863AC }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_TOKEN }}
           projectId: book-library-863ac
           target: book-library-863ac-70ff8
         env:

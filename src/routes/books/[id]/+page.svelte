@@ -11,4 +11,8 @@
   });
 </script>
 
+<svelte:head>
+  <title>Book Library | Book Details</title>
+</svelte:head>
+
 <BookDetail />

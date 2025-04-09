@@ -540,12 +540,15 @@ export class BookState {
     try {
       this.loading = true;
 
-      // Search parameters for Typesense to get facets
       const searchParameters = {
-        q: "*", // Match all documents
-        query_by: "title", // Required field
-        facet_by: "genre, avgRating, tags", // Request facets
-        per_page: 0, // We only need facets, not results
+        q: "*",
+        query_by: "title",
+        facet_by: "genre, avgRating, tags",
+        per_page: 0,
+        max_facet_values: 100,
+        facet_query_num_typos: 0,
+        include_fields: "id",
+        exhaustive_faceting: true,
       };
 
       const results = await client

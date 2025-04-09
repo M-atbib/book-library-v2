@@ -652,7 +652,7 @@ export class BookState {
         filter_by: filters.join(" && ") || "", // Apply filters if any
         facet_by: "genre, avgRating, tags", // Request facets for counts
         sort_by: "avgRating:desc", // Default sorting
-        per_page: 20,
+        per_page: this.pageSize,
         page,
       };
 
@@ -682,21 +682,66 @@ export class BookState {
     const nextPage = this.currentPage + 1;
     const currentCount = this.books.length;
 
-    if (this.lastSearchParams) {
-      const params = { ...this.lastSearchParams, page: nextPage };
+    try {
+      this.loading = true;
 
-      if (params.filter_by) {
-        await this.filterBooks([], [], [], nextPage);
-      } else if (params.sort_by) {
-        await this.sortBooks(params.sort_by.split(":")[0], nextPage);
-      } else {
-        await this.handleSearchResults(params.q, nextPage);
-      }
+      if (this.lastSearchParams) {
+        // Create a new params object with the updated page number
+        const params = { ...this.lastSearchParams, page: nextPage };
 
-      // If no new unique books were added, try loading the next page
-      if (currentCount === this.books.length && this.hasMoreResults) {
-        await this.loadMore();
+        // Execute the appropriate search method based on the params
+        let results;
+        if (params.filter_by) {
+          // This is a filter operation
+          results = await client
+            .collections("books")
+            .documents()
+            .search(params);
+        } else if (params.q && params.q !== "*") {
+          // This is a search operation
+          results = await client
+            .collections("books")
+            .documents()
+            .search(params);
+        } else if (params.sort_by) {
+          // This is a sort operation
+          results = await client
+            .collections("books")
+            .documents()
+            .search(params);
+        } else {
+          // Default search
+          results = await client
+            .collections("books")
+            .documents()
+            .search(params);
+        }
+
+        // Process the results
+        const newBooks = results.hits?.map((hit) => hit.document as Book) || [];
+
+        // Update the books state with the new results
+        if (newBooks.length > 0) {
+          this.books = this.deduplicateBooks([...this.books, ...newBooks]);
+          this.currentPage = nextPage;
+          this.totalHits = results.found;
+          this.hasMoreResults = this.books.length < this.totalHits;
+        } else {
+          // No more results
+          this.hasMoreResults = false;
+        }
+
+        // If no new books were added but we still have more results according to totalHits,
+        // there might be duplicates - try the next page
+        if (currentCount === this.books.length && this.hasMoreResults) {
+          await this.loadMore();
+        }
       }
+    } catch (error) {
+      this.error = handleError(error).message;
+      console.error("Error loading more books:", error);
+    } finally {
+      this.loading = false;
     }
   }
 }

@@ -19,10 +19,11 @@
   }
 </script>
 
-<div
+<a
   class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden cursor-pointer"
-  onclick={() => goto(`/books/${book.id}`)}
-  role="presentation"
+  href={`/books/${book.id}`}
+  target="_blank"
+  rel="noopener noreferrer"
 >
   <figure class="relative bg-gray-300 h-72">
     {#if book.coverUrl}
@@ -74,4 +75,4 @@
       {/each}
     </div>
   </div>
-</div>
+</a>

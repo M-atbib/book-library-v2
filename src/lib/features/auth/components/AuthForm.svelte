@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { GoogleButton } from "$lib/features/auth/components";
-  import { getUserState } from "$lib/features/auth/context/auth.svelte";
+  import { GoogleButton, getUserState } from "$lib/features";
   import type { UserRole } from "$lib/types/user.type";
 
   const context = getUserState();
@@ -128,7 +127,9 @@
     class="btn btn-primary w-full mt-2"
     disabled={!isFormValid}
   >
-    {isRegistration ? `Register as ${role.charAt(0).toUpperCase() + role.slice(1)}` : "Login"}
+    {isRegistration
+      ? `Register as ${role.charAt(0).toUpperCase() + role.slice(1)}`
+      : "Login"}
   </button>
 
   <div class="divider">OR</div>

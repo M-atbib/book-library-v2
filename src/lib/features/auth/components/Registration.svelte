@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Logo } from "$lib/components";
-  import { AuthForm } from "$lib/features/auth/components";
+  import { AuthForm } from "$lib/features";
   import { BookOpenText, LibraryBig } from "@lucide/svelte";
 
   let selectedRole = $state<"author" | "reader">("author");

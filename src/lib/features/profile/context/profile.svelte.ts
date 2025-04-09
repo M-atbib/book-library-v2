@@ -1,3 +1,11 @@
+/**
+ * Profile Context Module
+ *
+ * This module provides a Svelte context for managing user profile-related state and operations.
+ * It handles fetching, publishing, editing, and deleting books associated with the user's profile,
+ * as well as managing saved books and user roles using Firebase Firestore.
+ */
+
 import type { Book, SavedBook } from "$lib/types/books.type";
 import { auth, db } from "$lib/services/firebase";
 import {
@@ -20,6 +28,9 @@ import { setContext } from "svelte";
 import { toFirestoreTimestamp } from "$lib/utils/dateFormatting";
 import type { UserRole } from "$lib/types/user.type";
 
+/**
+ * Pagination state interface for book listings
+ */
 interface Pagination {
   currentPage: number;
   totalPages: number;
@@ -29,6 +40,9 @@ interface Pagination {
   pageSize: number;
 }
 
+/**
+ * ProfileState class that manages all profile-related state and operations
+ */
 export class ProfileState {
   savedBooks = $state<SavedBook[]>([]);
   publishedBooks = $state<Book[]>([]);
@@ -52,6 +66,10 @@ export class ProfileState {
     pageSize: 10,
   });
 
+  /**
+   * Fetches saved books for the current user with pagination support
+   * @param loadMore Whether to load more books or refresh the list
+   */
   async fetchSavedBooks(loadMore = false) {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
@@ -125,6 +143,10 @@ export class ProfileState {
     }
   }
 
+  /**
+   * Fetches books published by the current user with pagination support
+   * @param loadMore Whether to load more books or refresh the list
+   */
   async fetchPublishedBooks(loadMore = false) {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
@@ -201,6 +223,11 @@ export class ProfileState {
     }
   }
 
+  /**
+   * Publishes a new book to Firestore
+   * @param book Book data to publish (without ID)
+   * @returns The ID of the newly created book, or null if failed
+   */
   async publishBook(book: Omit<Book, "id">) {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
@@ -238,6 +265,11 @@ export class ProfileState {
     }
   }
 
+  /**
+   * Deletes a book from Firestore
+   * @param bookId ID of the book to delete
+   * @returns True if successful, false otherwise
+   */
   async deleteBook(bookId: string) {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
@@ -281,6 +313,11 @@ export class ProfileState {
     }
   }
 
+  /**
+   * Edits an existing book in Firestore
+   * @param book Updated book data with ID
+   * @returns True if successful, false otherwise
+   */
   async editBook(book: Book) {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
@@ -356,6 +393,10 @@ export class ProfileState {
     }
   }
 
+  /**
+   * Fetches the current user's role from Firebase Auth claims
+   * @returns The user's role or null if not authenticated
+   */
   async getRole() {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
@@ -371,6 +412,11 @@ export class ProfileState {
     }
   }
 
+  /**
+   * Removes a book from the user's saved books collection
+   * @param bookId ID of the book to remove
+   * @returns True if successful, false otherwise
+   */
   async removeSavedBook(bookId: string) {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
@@ -400,12 +446,23 @@ export class ProfileState {
   }
 }
 
+/**
+ * Symbol key for the profile state context
+ */
 const PROFILE_STATE_KEY = Symbol("PROFILE_STATE");
 
+/**
+ * Creates and sets the profile state context
+ * @returns The profile state instance
+ */
 export function setProfileState() {
   return setContext(PROFILE_STATE_KEY, new ProfileState());
 }
 
+/**
+ * Gets the profile state from the Svelte context
+ * @returns The profile state instance
+ */
 export function getProfileState() {
   return getContext<ReturnType<typeof setProfileState>>(PROFILE_STATE_KEY);
 }

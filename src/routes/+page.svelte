@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Login } from "$lib/features/auth/components";
+  import { Login } from "$lib/features";
 </script>
 
 <Login />

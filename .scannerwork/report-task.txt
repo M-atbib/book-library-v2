@@ -2,5 +2,5 @@ projectKey=sveltekit-app
 serverUrl=http://localhost:9000
 serverVersion=25.3.0.104237
 dashboardUrl=http://localhost:9000/dashboard?id=sveltekit-app
-ceTaskId=4e246fc2-677e-49f1-a6f4-b260f2eb755e
-ceTaskUrl=http://localhost:9000/api/ce/task?id=4e246fc2-677e-49f1-a6f4-b260f2eb755e
+ceTaskId=76ea6b67-d0c2-4924-b7e8-1a95dc0acbf3
+ceTaskUrl=http://localhost:9000/api/ce/task?id=76ea6b67-d0c2-4924-b7e8-1a95dc0acbf3

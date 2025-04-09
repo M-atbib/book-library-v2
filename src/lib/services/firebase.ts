@@ -1,11 +1,32 @@
-// Import the functions you need from the SDKs you need
+/**
+ * Firebase Service Module
+ *
+ * This module initializes and exports Firebase services used throughout the application.
+ * It configures Firebase with environment variables (with fallbacks for development)
+ * and provides centralized access to Firebase Authentication, Firestore Database,
+ * Cloud Functions, and Storage services.
+ *
+ * The module handles:
+ * - Firebase app initialization with proper configuration
+ * - Authentication service for user management
+ * - Firestore database for data storage and retrieval
+ * - Cloud Functions for serverless backend operations
+ * - Storage service for file uploads and management
+ *
+ * Environment variables are used to support different Firebase projects
+ * across development, staging, and production environments.
+ */
+
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
 
-// Your web app's Firebase configuration
+/**
+ * Firebase configuration object
+ * Uses environment variables with fallbacks for development
+ */
 const firebaseConfig = {
   apiKey:
     import.meta.env.VITE_FIREBASE_API_KEY ||
@@ -24,9 +45,11 @@ const firebaseConfig = {
     "1:611595985135:web:ec6563cbf210b52d78bb1a",
 };
 
-// Initialize Firebase
+// Initialize Firebase application
 export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const functions = getFunctions(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+
+// Initialize and export Firebase services
+export const auth = getAuth(app); // Authentication service
+export const functions = getFunctions(app); // Cloud Functions service
+export const db = getFirestore(app); // Firestore Database service
+export const storage = getStorage(app); // Storage service for files

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AuthForm } from "$lib/features/auth/components";
+  import { AuthForm } from "$lib/features";
   import { Logo } from "$lib/components";
 </script>
 

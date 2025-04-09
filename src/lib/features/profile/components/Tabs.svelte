@@ -1,8 +1,10 @@
 <script lang="ts">
-  import Profile from "./Profile.svelte";
-  import SavedBooks from "./SavedBooks.svelte";
-  import AuthorPublishedBooks from "./AuthorPublishedBooks.svelte";
-  import { getProfileState } from "$lib/features/profile/context/profile.svelte";
+  import {
+    Profile,
+    SavedBooks,
+    AuthorPublishedBooks,
+    getProfileState,
+  } from "$lib/features";
   import { onMount } from "svelte";
 
   const profileState = getProfileState();

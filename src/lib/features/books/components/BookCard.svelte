@@ -22,7 +22,6 @@
 <a
   class="card bg-base-100 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden cursor-pointer"
   href={`/books/${book.id}`}
-  target="_blank"
   rel="noopener noreferrer"
 >
   <figure class="relative bg-gray-300 h-72">

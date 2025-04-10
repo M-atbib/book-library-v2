@@ -56,27 +56,22 @@ interface FacetResult {
  * BookState class that manages all book-related state and operations
  */
 export class BookState {
+  // Books
   books = $state<Book[]>([]);
   book = $state<RatedBook | null>(null);
   totalBooks = $state<number>(0);
   isBookSaved = $state<boolean>(false);
-  pagination = $state<Pagination>({
-    currentPage: 1,
-    totalPages: 0,
-    hasNextPage: false,
-    hasPreviousPage: false,
-    lastVisible: null,
-    pageSize: 10,
-  });
 
-  loading = $state<boolean>(false);
-  error = $state<string | null>(null);
-
+  // Pagination & Search
   currentPage = $state<number>(1);
   totalHits = $state<number>(0);
   hasMoreResults = $state<boolean>(false);
   pageSize = $state<number>(20);
   lastSearchParams = $state<any>(null);
+
+  // Loading & Errors
+  loading = $state<boolean>(false);
+  error = $state<string | null>(null);
 
   /**
    * Helper method to deduplicate books by ID
@@ -94,85 +89,22 @@ export class BookState {
   }
 
   /**
-   * Fetches books from Firestore with pagination
-   * @param loadMore Whether to load more books or start from the first page
+   * Common method to update books state after search/filter/sort
+   * @param results Search results from Typesense
+   * @param page Current page number
+   * @param newBooks New books to add to the state
    */
-  async fetchBooks(loadMore = false) {
-    try {
-      this.loading = true;
-      this.error = null;
-
-      const booksRef = collection(db, "books");
-      let booksQuery;
-
-      if (loadMore && this.pagination.lastVisible) {
-        // Load next page
-        booksQuery = query(
-          booksRef,
-          orderBy("title"),
-          startAfter(this.pagination.lastVisible),
-          limit(this.pagination.pageSize)
-        );
-      } else {
-        // Load first page
-        booksQuery = query(
-          booksRef,
-          orderBy("title"),
-          limit(this.pagination.pageSize)
-        );
-
-        if (!loadMore) {
-          this.books = [];
-          this.pagination.currentPage = 1;
-        }
-      }
-
-      const snapshot = await getDocs(booksQuery);
-
-      // Update pagination
-      const lastVisible = snapshot.docs[snapshot.docs.length - 1];
-      const hasNextPage = snapshot.docs.length === this.pagination.pageSize;
-
-      if (loadMore) {
-        // Append books to existing list
-        const newBooks = snapshot.docs.map(
-          (doc) =>
-            ({
-              id: doc.id,
-              ...doc.data(),
-            } as Book)
-        );
-
-        this.books = [...this.books, ...newBooks];
-        this.pagination.currentPage += 1;
-      } else {
-        // Replace books with new list
-        this.books = snapshot.docs.map(
-          (doc) =>
-            ({
-              id: doc.id,
-              ...doc.data(),
-            } as Book)
-        );
-      }
-
-      // Update pagination state
-      this.pagination.lastVisible = lastVisible;
-      this.pagination.hasNextPage = hasNextPage;
-      this.pagination.hasPreviousPage = this.pagination.currentPage > 1;
-
-      // Get total count (in a real app, you might want to use a counter document)
-      const countQuery = await getDocs(collection(db, "books"));
-      this.totalBooks = countQuery.size;
-      this.pagination.totalPages = Math.ceil(
-        this.totalBooks / this.pagination.pageSize
-      );
-    } catch (error) {
-      this.error = handleError(error).message;
-      console.error("Error fetching books:", error);
-    } finally {
-      this.loading = false;
+  private updateBooksState(results: any, page: number, newBooks: Book[]) {
+    if (page === 1) {
+      this.books = newBooks;
+    } else {
+      // Deduplicate books when appending new results
+      this.books = this.deduplicateBooks([...this.books, ...newBooks]);
     }
+
+    this.totalHits = results.found;
+    this.currentPage = page;
+    this.hasMoreResults = this.books.length < this.totalHits;
   }
 
   /**
@@ -390,25 +322,6 @@ export class BookState {
     } finally {
       this.loading = false;
     }
-  }
-
-  /**
-   * Common method to update books state after search/filter/sort
-   * @param results Search results from Typesense
-   * @param page Current page number
-   * @param newBooks New books to add to the state
-   */
-  private updateBooksState(results: any, page: number, newBooks: Book[]) {
-    if (page === 1) {
-      this.books = newBooks;
-    } else {
-      // Deduplicate books when appending new results
-      this.books = this.deduplicateBooks([...this.books, ...newBooks]);
-    }
-
-    this.totalHits = results.found;
-    this.currentPage = page;
-    this.hasMoreResults = this.books.length < this.totalHits;
   }
 
   /**

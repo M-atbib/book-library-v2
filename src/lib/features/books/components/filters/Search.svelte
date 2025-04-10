@@ -1,173 +1,195 @@
 <script lang="ts">
-  import { Search, X } from "@lucide/svelte";
-  import { getBookState } from "$lib/features/books/context/books.svelte";
-  import { page } from "$app/stores";
-  import { afterNavigate, goto } from "$app/navigation";
+  import instantsearch from "instantsearch.js";
+  import { searchClient } from "$lib/services/typesense";
+  import { onMount } from "svelte";
+  import { connectAutocomplete } from "instantsearch.js/es/connectors";
+  import { goto } from "$app/navigation";
 
-  const bookState = getBookState();
-
-  let searchQuery = $state("");
-  let suggestions = $state<any[]>([]);
-  let showSuggestions = $state(false);
-  let loading = $state(false);
-  let selectedIndex = $state(-1);
-
-  afterNavigate(() => {
-    searchQuery = "";
-    suggestions = [];
-    showSuggestions = false;
+  // Create a separate instance for autocomplete that won't affect the main search
+  let autocompleteSearch = instantsearch({
+    indexName: "books",
+    searchClient,
+    future: {
+      preserveSharedStateOnUnmount: true,
+    },
   });
 
-  // Only show autocomplete if not on books page
-  $effect(() => {
-    const isBookPage = $page.url.pathname === "/books";
-    if (isBookPage) {
-      // On books page, just perform regular search
-      bookState.handleSearchResults(searchQuery);
-    } else if (searchQuery.length >= 2) {
-      // On other pages, show autocomplete
-      fetchSuggestions();
-    } else {
-      suggestions = [];
-      showSuggestions = false;
-    }
-  });
+  let searchContainer;
+  let totalHits = 0;
+  let displayedHits = 0;
 
-  async function fetchSuggestions() {
-    loading = true;
-    try {
-      suggestions = await bookState.getSearchSuggestions(searchQuery);
-      showSuggestions = suggestions.length > 0;
-      selectedIndex = -1;
-    } catch (error) {
-      console.error("Error fetching suggestions:", error);
-      suggestions = [];
-    } finally {
-      loading = false;
-    }
-  }
+  onMount(() => {
+    autocompleteSearch.start();
 
-  function handleKeydown(event: KeyboardEvent) {
-    if (!showSuggestions) return;
+    // 1. Create a render function for autocomplete
+    const renderAutocomplete = (renderOptions: any, isFirstRender: any) => {
+      const { indices, currentRefinement, refine, widgetParams } =
+        renderOptions;
 
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      selectedIndex = Math.min(selectedIndex + 1, suggestions.length - 1);
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      selectedIndex = Math.max(selectedIndex - 1, -1);
-    } else if (event.key === "Enter") {
-      if (selectedIndex >= 0) {
-        selectSuggestion(suggestions[selectedIndex]);
-      } else {
-        // Navigate to books page with search query
-        goto(`/books?search=${encodeURIComponent(searchQuery)}`);
+      const container = document.querySelector("#autocomplete");
+
+      if (isFirstRender) {
+        // Create the root div with position relative to contain the dropdown
+        const rootDiv = document.createElement("div");
+        rootDiv.className = "relative w-full";
+
+        // Create input with daisyUI styling
+        const inputContainer = document.createElement("div");
+        inputContainer.className = "form-control w-full";
+
+        const input = document.createElement("input");
+        input.type = "search";
+        input.placeholder = "Search for books...";
+        input.className = "input input-bordered w-full";
+
+        input.addEventListener("input", (event) => {
+          refine((event.target as HTMLInputElement).value);
+        });
+
+        // Add keydown event listener to handle Enter key press
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            const searchTerm = (event.target as HTMLInputElement).value;
+            if (searchTerm.trim()) {
+              // Redirect to search page with the query parameter
+              goto(`/search-book?q=${encodeURIComponent(searchTerm)}`);
+              // Clear the input after search
+              (event.target as HTMLInputElement).value = '';
+              refine('');
+            }
+          }
+        });
+
+        // Create suggestions container with absolute positioning
+        const suggestionsDiv = document.createElement("div");
+        suggestionsDiv.className =
+          "suggestions-dropdown card card-compact dropdown-content shadow bg-base-100 rounded-box absolute top-full left-0 right-0 z-50 mt-1 max-h-80 overflow-y-auto w-full hidden";
+
+        inputContainer.appendChild(input);
+        rootDiv.appendChild(inputContainer);
+        rootDiv.appendChild(suggestionsDiv);
+
+        if (container) {
+          container.appendChild(rootDiv);
+        }
       }
-    } else if (event.key === "Escape") {
-      showSuggestions = false;
-    }
-  }
 
-  async function selectSuggestion(suggestion: any) {
-    searchQuery = "";
-    showSuggestions = false;
-    await goto(`/books/${suggestion.id}`);
-    await bookState.fetchBookById(suggestion.id);
-  }
+      // Update the suggestions
+      const rootDiv = container?.querySelector("div");
+      const suggestionsDiv = rootDiv?.querySelector(
+        ".suggestions-dropdown"
+      ) as HTMLElement;
+      const input = rootDiv?.querySelector("input");
 
-  function clearSearch() {
-    searchQuery = "";
-    suggestions = [];
-    showSuggestions = false;
-  }
+      if (input) {
+        input.value = currentRefinement;
+      }
 
-  function handleBlur() {
-    // Delay hiding suggestions to allow for clicks
-    setTimeout(() => {
-      showSuggestions = false;
-    }, 200);
-  }
+      if (suggestionsDiv) {
+        // Show/hide suggestions based on input
+        if (currentRefinement.length > 0 && indices[0]?.hits.length > 0) {
+          suggestionsDiv.classList.remove("hidden");
+        } else {
+          suggestionsDiv.classList.add("hidden");
+          return;
+        }
+
+        // Clear previous suggestions
+        suggestionsDiv.innerHTML = "";
+
+        // Add new suggestions
+        indices[0]?.hits
+          .slice(0, 5)
+          .forEach((hit: any, index: number, array: any[]) => {
+            const suggestionItem = document.createElement("div");
+            suggestionItem.className =
+              "p-3 hover:bg-base-200 cursor-pointer flex gap-4";
+
+            if (index < array.length - 1) {
+              suggestionItem.classList.add("border-b", "border-base-200");
+            }
+
+            // Add book cover image
+            const coverContainer = document.createElement("div");
+            coverContainer.className = "flex-shrink-0 w-[50px]";
+
+            const coverImage = document.createElement("img");
+            coverImage.src = hit.coverUrl;
+            coverImage.alt = hit.title;
+            coverImage.className =
+              "w-full h-auto object-cover rounded max-h-[70px]";
+            coverImage.onerror = () => {
+              coverImage.src = "/images/book-placeholder.png";
+            };
+
+            coverContainer.appendChild(coverImage);
+
+            // Content container for title and author
+            const contentContainer = document.createElement("div");
+            contentContainer.className = "flex-grow";
+
+            const title = document.createElement("div");
+            title.className = "font-medium text-base-content";
+            title.textContent = hit.title;
+
+            const author = document.createElement("div");
+            author.className = "text-sm text-base-content/70";
+
+            // Use authorName if available, otherwise fall back to authors array
+            if (hit.authorName) {
+              author.textContent = `By: ${hit.authorName}`;
+            } else if (hit.authors) {
+              author.textContent = `By: ${Array.isArray(hit.authors) ? hit.authors.join(", ") : hit.authors}`;
+            } else {
+              author.textContent = "Unknown author";
+            }
+
+            contentContainer.appendChild(title);
+            contentContainer.appendChild(author);
+
+            suggestionItem.appendChild(coverContainer);
+            suggestionItem.appendChild(contentContainer);
+
+            suggestionItem.addEventListener("click", () => {
+              if (input) {
+                input.value = hit.title;
+                suggestionsDiv.classList.add("hidden");
+
+                // Navigate to the book detail page when a suggestion is clicked
+                goto(`/books/${hit.id}`);
+              }
+            });
+
+            suggestionsDiv.appendChild(suggestionItem);
+          });
+
+        // Add click outside listener to close suggestions
+        document.addEventListener("click", (event) => {
+          if (!container?.contains(event.target as Node)) {
+            suggestionsDiv.classList.add("hidden");
+          }
+        });
+      }
+    };
+
+    // 2. Create the custom autocomplete widget
+    const customAutocomplete = connectAutocomplete(renderAutocomplete);
+
+    // Add the autocomplete widget to the separate search instance
+    autocompleteSearch.addWidgets([customAutocomplete({})]);
+  });
 </script>
 
-<div class="form-control w-full relative">
-  <div class="input-group relative">
-    <input
-      type="text"
-      placeholder="Search books..."
-      class="input input-bordered w-full"
-      bind:value={searchQuery}
-      onkeydown={handleKeydown}
-      onfocus={() => searchQuery.length >= 2 && (showSuggestions = true)}
-      onblur={handleBlur}
-      aria-label="Search for books"
-      aria-autocomplete="list"
-      aria-controls="search-suggestions"
-    />
-
-    {#if searchQuery}
-      <button
-        class="absolute inset-y-0 right-8 flex items-center pr-2"
-        onclick={clearSearch}
-        aria-label="Clear search"
-      >
-        <X size={16} class="text-gray-400 hover:text-gray-600" />
-      </button>
+<div class="w-full">
+  <div bind:this={searchContainer} class="w-full p-4">
+    <div id="stats" class="hidden"></div>
+    {#if totalHits > 0}
+      <p class="text-base-content/70 mb-4">
+        Showing {displayedHits} of {totalHits} books
+      </p>
     {/if}
-
-    <div
-      class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-    >
-      {#if loading}
-        <span class="loading loading-spinner loading-xs text-primary"></span>
-      {:else}
-        <Search size={18} class="text-gray-400" />
-      {/if}
-    </div>
+    <div id="autocomplete" class="mb-6"></div>
+    <div id="hits" class="mt-4"></div>
   </div>
-
-  {#if showSuggestions}
-    <div
-      id="search-suggestions"
-      class="absolute z-10 p-0 mt-1 w-full bg-base-100 shadow-lg rounded-box border border-base-300 max-h-60 overflow-y-auto"
-      role="listbox"
-    >
-      {#each suggestions as suggestion, i}
-        <div
-          class="px-4 py-2 hover:bg-base-200 cursor-pointer flex items-center gap-2 min-w-[200px] {selectedIndex ===
-          i
-            ? 'bg-base-200'
-            : ''}"
-          onclick={() => selectSuggestion(suggestion)}
-          role="presentation"
-        >
-          {#if suggestion.coverUrl}
-            <img
-              src={suggestion.coverUrl}
-              alt={suggestion.title}
-              class="h-10 w-8 object-cover rounded"
-            />
-          {:else}
-            <div
-              class="h-10 w-8 bg-base-300 rounded flex items-center justify-center"
-            >
-              <span class="text-xs">No img</span>
-            </div>
-          {/if}
-          <div>
-            <div class="font-medium">{suggestion.title}</div>
-            <div class="text-sm text-base-content opacity-70">
-              {suggestion.authorName}
-            </div>
-          </div>
-        </div>
-      {/each}
-      <div
-        class="px-4 py-2 text-primary hover:bg-base-200 cursor-pointer border-t border-base-300"
-      >
-        <a href="/books?search={encodeURIComponent(searchQuery)}">
-          View all results for "{searchQuery}"
-        </a>
-      </div>
-    </div>
-  {/if}
 </div>

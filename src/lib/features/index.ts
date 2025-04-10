@@ -3,7 +3,7 @@ export { default as Login } from "./auth/components/Login.svelte";
 export { default as Registration } from "./auth/components/Registration.svelte";
 export { default as AuthForm } from "./auth/components/AuthForm.svelte";
 export { default as GoogleButton } from "./auth/components/GoogleButton.svelte";
-export { default as Profile } from "./auth/components/Profile.svelte";
+export { default as Profile } from "../components/common/Profile.svelte";
 
 /* Books */
 export { default as BookCard } from "./books/components/BookCard.svelte";

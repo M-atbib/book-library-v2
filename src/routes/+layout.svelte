@@ -10,14 +10,16 @@
   import { initializeErrorTracking } from "$lib/services/bugsnag";
   import {
     setBookState,
-    setProfileState,
     setUserState,
     getUserState,
+    setReaderState,
+    setAuthorState,
   } from "$lib/features";
 
   setUserState();
   setBookState();
-  setProfileState();
+  setReaderState();
+  setAuthorState();
 
   const userState = getUserState();
   let { children } = $props();

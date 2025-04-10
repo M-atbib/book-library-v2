@@ -2,7 +2,7 @@
   import { getUserState } from "$lib/features/auth/context/auth.svelte";
   import { Logo } from "$lib/components";
   import { LogOut, User } from "@lucide/svelte";
-  import Search from "$lib/features/filters/components/Search.svelte";
+  import { Search } from "$lib/features";
 
   const context = getUserState();
 </script>

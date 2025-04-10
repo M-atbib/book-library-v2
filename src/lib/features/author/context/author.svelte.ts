@@ -1,12 +1,12 @@
 /**
- * Profile Context Module
+ * Author Context Module
  *
- * This module provides a Svelte context for managing user profile-related state and operations.
+ * This module provides a Svelte context for managing author-related state and operations.
  * It handles fetching, publishing, editing, and deleting books associated with the user's profile,
  * as well as managing saved books and user roles using Firebase Firestore.
  */
 
-import type { Book, SavedBook } from "$lib/types/books.type";
+import type { Book } from "$lib/types/books.type";
 import { auth, db } from "$lib/services/firebase";
 import {
   collection,
@@ -41,22 +41,13 @@ interface Pagination {
 }
 
 /**
- * ProfileState class that manages all profile-related state and operations
+ * AuthorState class that manages all author-related state and operations
  */
-export class ProfileState {
-  savedBooks = $state<SavedBook[]>([]);
+export class AuthorState {
   publishedBooks = $state<Book[]>([]);
   loading = $state<boolean>(false);
   error = $state<string | null>(null);
   role = $state<UserRole | null>(null);
-  savedBooksPagination = $state<Pagination>({
-    currentPage: 1,
-    totalPages: 0,
-    hasNextPage: false,
-    hasPreviousPage: false,
-    lastVisible: null,
-    pageSize: 10,
-  });
   publishedBooksPagination = $state<Pagination>({
     currentPage: 1,
     totalPages: 0,
@@ -65,83 +56,6 @@ export class ProfileState {
     lastVisible: null,
     pageSize: 10,
   });
-
-  /**
-   * Fetches saved books for the current user with pagination support
-   * @param loadMore Whether to load more books or refresh the list
-   */
-  async fetchSavedBooks(loadMore = false) {
-    if (!auth.currentUser) {
-      this.error = "User not authenticated";
-      return;
-    }
-
-    try {
-      this.loading = true;
-      this.error = null;
-
-      const userId = auth.currentUser.uid;
-      const savedBooksRef = collection(db, `users/${userId}/savedBooks`);
-
-      let savedBooksQuery;
-
-      if (loadMore && this.savedBooksPagination.lastVisible) {
-        savedBooksQuery = query(
-          savedBooksRef,
-          orderBy("title"),
-          startAfter(this.savedBooksPagination.lastVisible),
-          limit(this.savedBooksPagination.pageSize)
-        );
-      } else {
-        // First load or refresh
-        savedBooksQuery = query(
-          savedBooksRef,
-          orderBy("title"),
-          limit(this.savedBooksPagination.pageSize)
-        );
-
-        if (!loadMore) {
-          this.savedBooks = [];
-          this.savedBooksPagination.currentPage = 1;
-        }
-      }
-
-      const snapshot = await getDocs(savedBooksQuery);
-
-      if (snapshot.empty && !loadMore) {
-        this.savedBooks = [];
-        this.savedBooksPagination.hasNextPage = false;
-        return;
-      }
-
-      const books: SavedBook[] = [];
-      snapshot.forEach((doc) => {
-        const bookData = doc.data() as SavedBook;
-        books.push({
-          ...bookData,
-        });
-      });
-
-      // Update pagination
-      this.savedBooksPagination.lastVisible =
-        snapshot.docs[snapshot.docs.length - 1];
-      this.savedBooksPagination.hasNextPage =
-        books.length === this.savedBooksPagination.pageSize;
-      this.savedBooksPagination.hasPreviousPage =
-        this.savedBooksPagination.currentPage > 1;
-
-      if (loadMore) {
-        this.savedBooks = [...this.savedBooks, ...books];
-        this.savedBooksPagination.currentPage += 1;
-      } else {
-        this.savedBooks = books;
-      }
-    } catch (error) {
-      this.error = handleError(error).message;
-    } finally {
-      this.loading = false;
-    }
-  }
 
   /**
    * Fetches books published by the current user with pagination support
@@ -411,58 +325,25 @@ export class ProfileState {
       return null;
     }
   }
-
-  /**
-   * Removes a book from the user's saved books collection
-   * @param bookId ID of the book to remove
-   * @returns True if successful, false otherwise
-   */
-  async removeSavedBook(bookId: string) {
-    if (!auth.currentUser) {
-      this.error = "User not authenticated";
-      return false;
-    }
-
-    try {
-      this.loading = true;
-      this.error = null;
-
-      const userId = auth.currentUser.uid;
-      const savedBookRef = doc(db, `users/${userId}/savedBooks`, bookId);
-
-      // Delete the document from the savedBooks subcollection
-      await deleteDoc(savedBookRef);
-
-      // Update the local state by removing the book
-      this.savedBooks = this.savedBooks.filter((book) => book.id !== bookId);
-
-      return true;
-    } catch (error) {
-      this.error = handleError(error).message;
-      return false;
-    } finally {
-      this.loading = false;
-    }
-  }
 }
 
 /**
- * Symbol key for the profile state context
+ * Symbol key for the author state context
  */
-const PROFILE_STATE_KEY = Symbol("PROFILE_STATE");
+const AUTHOR_STATE_KEY = Symbol("AUTHOR_STATE");
 
 /**
- * Creates and sets the profile state context
- * @returns The profile state instance
+ * Creates and sets the author state context
+ * @returns The author state instance
  */
-export function setProfileState() {
-  return setContext(PROFILE_STATE_KEY, new ProfileState());
+export function setAuthorState() {
+  return setContext(AUTHOR_STATE_KEY, new AuthorState());
 }
 
 /**
  * Gets the profile state from the Svelte context
  * @returns The profile state instance
  */
-export function getProfileState() {
-  return getContext<ReturnType<typeof setProfileState>>(PROFILE_STATE_KEY);
+export function getAuthorState() {
+  return getContext<ReturnType<typeof setAuthorState>>(AUTHOR_STATE_KEY);
 }

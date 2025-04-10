@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { getProfileState } from "$lib/features/profile/context/profile.svelte";
+  import { getAuthorState } from "$lib/features";
   import { auth } from "$lib/services/firebase";
   import type { Book } from "$lib/types/books.type";
   import { Edit, X } from "@lucide/svelte";
 
-  const profileState = getProfileState();
+  const authorState = getAuthorState();
 
   // Props for component mode (create or edit)
   interface Props {
@@ -68,7 +68,10 @@
 
   function openModal(editBook?: Book) {
     if (editBook) {
-      book = { ...editBook , publishedDate: new Date(editBook.publishedDate) };
+      book = {
+        ...editBook,
+        publishedDate: new Date(editBook.publishedDate),
+      };
     } else if (isEditing && initialBook) {
       // Make sure we use initialBook in edit mode
       book = { ...initialBook };
@@ -116,9 +119,9 @@
     try {
       if (isEditing) {
         // Update book logic would go here
-        await profileState.editBook(book);
+        await authorState.editBook(book);
       } else {
-        await profileState.publishBook(book);
+        await authorState.publishBook(book);
       }
       closeModal();
     } catch (error) {

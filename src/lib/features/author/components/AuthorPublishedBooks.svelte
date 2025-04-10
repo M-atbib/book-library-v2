@@ -1,27 +1,27 @@
 <script lang="ts">
-  import { getProfileState, PublishNewBook } from "$lib/features";
+  import { getAuthorState, PublishNewBook } from "$lib/features";
   import { formatDate } from "$lib/utils/dateFormatting";
   import { onMount } from "svelte";
   import { Trash2, X } from "@lucide/svelte";
 
-  const profileState = getProfileState();
+  const authorState = getAuthorState();
 
   onMount(() => {
-    profileState.fetchPublishedBooks();
+    authorState.fetchPublishedBooks();
   });
 
   function loadMoreBooks() {
-    profileState.fetchPublishedBooks(true);
+    authorState.fetchPublishedBooks(true);
   }
 
   async function handleDeleteBook(bookId: string) {
     if (confirm("Are you sure you want to delete this book?")) {
-      await profileState.deleteBook(bookId);
+      await authorState.deleteBook(bookId);
     }
   }
 
   function clearError() {
-    profileState.error = null;
+    authorState.error = null;
   }
 </script>
 
@@ -31,16 +31,16 @@
     <PublishNewBook />
   </div>
 
-  {#if profileState.error}
+  {#if authorState.error}
     <div class="alert alert-error mb-4 flex justify-between">
-      <span>{profileState.error}</span>
+      <span>{authorState.error}</span>
       <button class="btn btn-ghost btn-sm" onclick={clearError}>
         <X size={18} />
       </button>
     </div>
   {/if}
 
-  {#if profileState.publishedBooks.length === 0}
+  {#if authorState.publishedBooks.length === 0}
     <div class="alert alert-info">
       <span>You haven't published any books yet.</span>
     </div>
@@ -58,7 +58,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each profileState.publishedBooks as book}
+          {#each authorState.publishedBooks as book}
             <tr>
               <td class="w-16">
                 {#if book.coverUrl}
@@ -94,7 +94,7 @@
       </table>
     </div>
 
-    {#if profileState.publishedBooksPagination.hasNextPage}
+    {#if authorState.publishedBooksPagination.hasNextPage}
       <div class="flex justify-center mt-6">
         <button class="btn btn-primary" onclick={loadMoreBooks}>
           Load More

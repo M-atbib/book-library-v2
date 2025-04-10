@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Tabs } from "$lib/features";
+  import { Tabs } from "$lib/components";
 </script>
 
 <svelte:head>

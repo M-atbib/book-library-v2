@@ -1,13 +1,13 @@
 <script lang="ts">
   import {
-    Profile,
     SavedBooks,
     AuthorPublishedBooks,
-    getProfileState,
+    getAuthorState,
+    Profile,
   } from "$lib/features";
   import { onMount } from "svelte";
 
-  const profileState = getProfileState();
+  const authorState = getAuthorState();
   // Define tabs
   const tabs = [
     { id: "profile", label: "My Profile", component: Profile },
@@ -25,8 +25,8 @@
   }
 
   onMount(async () => {
-    await profileState.getRole();
-    const isAuthor = profileState.role === "author";
+    await authorState.getRole();
+    const isAuthor = authorState.role === "author";
     visibleTabs = tabs.filter((tab) => tab.id !== "published" || isAuthor);
   });
 </script>
@@ -47,7 +47,13 @@
   <!-- Tab content -->
   {#each visibleTabs as tab}
     {#if activeTab === tab.id}
-      <svelte:component this={tab.component} />
+      {#if tab.id === "profile"}
+        <Profile />
+      {:else if tab.id === "books"}
+        <SavedBooks />
+      {:else if tab.id === "published"}
+        <AuthorPublishedBooks />
+      {/if}
     {/if}
   {/each}
 </div>

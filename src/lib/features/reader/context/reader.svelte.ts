@@ -21,6 +21,10 @@ import {
 import { handleError } from "$lib/utils/errorHandling";
 import { getContext } from "svelte";
 import { setContext } from "svelte";
+import { searchClient } from "$lib/services/typesense";
+import instantsearch from "instantsearch.js/es/index";
+import { searchBox, configure } from "instantsearch.js/es/widgets";
+import { connectHits, connectPagination } from "instantsearch.js/es/connectors";
 
 /**
  * Pagination state interface for book listings
@@ -49,6 +53,87 @@ export class ReaderState {
     lastVisible: null,
     pageSize: 10,
   });
+
+  // Search state
+  searchInstance: any = null;
+  searchResults = $state<SavedBook[]>([]);
+  currentPage = $state(1);
+  totalPages = $state(0);
+  refineFunction: ((page: number) => void) | null = null;
+
+  /**
+   * Initializes the search functionality
+   */
+  initializeSearch() {
+    if (!auth.currentUser) return;
+
+    const userId = auth.currentUser.uid;
+
+    this.searchInstance = instantsearch({
+      indexName: "savedBooks",
+      searchClient,
+    });
+
+    const customHits = connectHits(({ hits }) => {
+      this.searchResults = hits as unknown as SavedBook[];
+    });
+
+    const customPagination = connectPagination(
+      ({ currentRefinement, nbPages, refine }) => {
+        this.currentPage = currentRefinement;
+        this.totalPages = nbPages;
+        this.refineFunction = refine;
+      }
+    );
+
+    this.searchInstance.addWidgets([
+      configure({
+        facetFilters: [`userId:${userId}`],
+        distinct: true,
+        page: 0,
+      }),
+      searchBox({
+        container: "#searchbox",
+        placeholder: "Search your saved books",
+        cssClasses: {
+          input: "input input-bordered w-full",
+          submit: "btn btn-ghost absolute right-0 top-0",
+          reset: "btn btn-ghost absolute right-12 top-0",
+        },
+      }),
+      customHits({}),
+      customPagination({}),
+    ]);
+
+    this.searchInstance.start();
+  }
+
+  /**
+   * Disposes of the search instance
+   */
+  disposeSearch() {
+    if (this.searchInstance) {
+      this.searchInstance.dispose();
+    }
+  }
+
+  /**
+   * Handles page changes in search results
+   */
+  handlePageChange(newPage: number) {
+    if (this.refineFunction) {
+      this.refineFunction(newPage);
+    }
+  }
+
+  /**
+   * Refreshes the search results
+   */
+  refreshSearch() {
+    if (this.searchInstance) {
+      this.searchInstance.refresh();
+    }
+  }
 
   /**
    * Fetches saved books for the current user with pagination support
@@ -150,6 +235,9 @@ export class ReaderState {
 
       // Update the local state by removing the book
       this.savedBooks = this.savedBooks.filter((book) => book.id !== bookId);
+
+      // Refresh search results after removal
+      this.refreshSearch();
 
       return true;
     } catch (error) {

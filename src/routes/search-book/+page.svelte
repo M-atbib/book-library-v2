@@ -2,11 +2,11 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import instantsearch from "instantsearch.js";
-  import { searchBox, configure, hits as hitsWidget } from "instantsearch.js/es/widgets";
+  import { searchBox, configure } from "instantsearch.js/es/widgets";
   import { connectHits } from "instantsearch.js/es/connectors";
   import { searchClient } from "$lib/services/typesense";
   import { NoContent } from "$lib/components";
-  import { BookCard, Facet } from "$lib/features";
+  import { BookCard } from "$lib/features";
   import type { Book } from "$lib/types/books.type";
 
   // Get search query from URL params
@@ -47,7 +47,8 @@
         cssClasses: {
           form: "relative",
           input: "input input-bordered w-full",
-          submit: "btn btn-ghost text-white absolute right-0 top-0 rounded-l-none",
+          submit:
+            "btn btn-ghost text-white absolute right-0 top-0 rounded-l-none",
           reset: "btn btn-ghost absolute right-8 top-0",
           loadingIndicator: "loading loading-spinner absolute right-24 top-3",
         },
@@ -88,7 +89,7 @@
 
 <div class="container mx-auto px-4 py-8">
   <h1 class="text-2xl font-bold mb-6">Search Books</h1>
-  
+
   <div class="mb-8">
     <div id="searchbox" class="form-control w-full"></div>
   </div>
@@ -100,11 +101,6 @@
   {/if}
 
   <div class="flex flex-col md:flex-row gap-6">
-    <!-- Facets sidebar -->
-    <div class="w-full md:w-64 flex-shrink-0">
-      <Facet search={search} />
-    </div>
-    
     <!-- Search results -->
     <div class="flex-grow">
       {#if loading && books.length === 0}
@@ -116,11 +112,12 @@
       {:else}
         <div class="mb-4">
           <p class="text-base-content/70">
-            Found {totalHits} {totalHits === 1 ? 'book' : 'books'} matching your search
+            Found {totalHits}
+            {totalHits === 1 ? "book" : "books"} matching your search
           </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           {#each books as book (book.id)}
             <BookCard {book} />
           {/each}

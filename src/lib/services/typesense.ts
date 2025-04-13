@@ -38,7 +38,7 @@ export const client = new Typesense.Client({
  */
 const typesenseInstantsearchAdapter = new TypesenseInstantsearchAdapter({
   server: {
-    apiKey: import.meta.env.VITE_TYPESENSE_SEARCH_ONLY_API_KEY, // Be sure to use an API key that only allows search operations
+    apiKey: import.meta.env.VITE_TYPESENSE_SEARCH_ONLY_API_KEY,
     nodes: [
       {
         host: import.meta.env.VITE_TYPESENSE_HOST,
@@ -49,10 +49,19 @@ const typesenseInstantsearchAdapter = new TypesenseInstantsearchAdapter({
     cacheSearchResultsForSeconds: 2 * 60,
   },
   additionalSearchParameters: {
-    query_by: "title,authorName,description,genre,tags",
-    sort_by: "_text_match:desc,publishedDate:desc", // Default sort by newest first
-    facet_by: "genre,tags,avgRating", // Enable faceting for these fields
+    query_by: "title,authorName,genre,tags",
+    query_by_weights: "2,2,2,2",
+    sort_by: "_text_match:desc",
+    facet_sample_threshold: 1000,
+    facet_sample_percent: 20,
+    highlight_full_fields: "title,authorName,genre,tags",
+    facet_by: "avgRating,genre,tags",
+    max_facet_values: 20,
+  },
+  filterByOptions: {
+    genre: { exactMatch: true },
+    tags: { exactMatch: false },
+    avgRating: { exactMatch: false },
   },
 });
-
 export const searchClient = typesenseInstantsearchAdapter.searchClient;

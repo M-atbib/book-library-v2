@@ -14,43 +14,19 @@ import type {
 } from "$lib/types/books.type";
 import { getContext, setContext } from "svelte";
 import {
-  collection,
   doc,
   getDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
   setDoc,
-  startAfter,
   deleteDoc,
   updateDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { handleError } from "$lib/utils/errorHandling";
 import { auth, db } from "$lib/services/firebase";
-import { client } from "$lib/services/typesense";
-
-/**
- * Pagination state interface for book listings
- */
-interface Pagination {
-  currentPage: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  lastVisible: any;
-  pageSize: number;
-}
-
-/**
- * Interface for faceted search results
- */
-interface FacetResult {
-  genres: { value: string; count: number }[];
-  ratings: { value: number; count: number }[];
-  tags: { value: string; count: number }[];
-}
+import instantsearch from "instantsearch.js";
+import { client, searchClient } from "$lib/services/typesense";
+import { history } from "instantsearch.js/es/lib/routers";
+import type { UiState } from "instantsearch.js";
 
 /**
  * BookState class that manages all book-related state and operations
@@ -62,50 +38,34 @@ export class BookState {
   totalBooks = $state<number>(0);
   isBookSaved = $state<boolean>(false);
 
-  // Pagination & Search
-  currentPage = $state<number>(1);
-  totalHits = $state<number>(0);
-  hasMoreResults = $state<boolean>(false);
-  pageSize = $state<number>(20);
-  lastSearchParams = $state<any>(null);
-
   // Loading & Errors
   loading = $state<boolean>(false);
   error = $state<string | null>(null);
 
-  /**
-   * Helper method to deduplicate books by ID
-   * @param books Array of books to deduplicate
-   * @returns Array of unique books
-   */
-  private deduplicateBooks(books: Book[]): Book[] {
-    const uniqueBooks = new Map<string, Book>();
-    books.forEach((book) => {
-      if (!uniqueBooks.has(book.id)) {
-        uniqueBooks.set(book.id, book);
-      }
-    });
-    return Array.from(uniqueBooks.values());
-  }
+  // Track if search has been initialized
+  searchInitialized = $state<boolean>(false);
 
-  /**
-   * Common method to update books state after search/filter/sort
-   * @param results Search results from Typesense
-   * @param page Current page number
-   * @param newBooks New books to add to the state
-   */
-  private updateBooksState(results: any, page: number, newBooks: Book[]) {
-    if (page === 1) {
-      this.books = newBooks;
-    } else {
-      // Deduplicate books when appending new results
-      this.books = this.deduplicateBooks([...this.books, ...newBooks]);
-    }
-
-    this.totalHits = results.found;
-    this.currentPage = page;
-    this.hasMoreResults = this.books.length < this.totalHits;
-  }
+  search = instantsearch({
+    indexName: "books",
+    searchClient,
+    routing: {
+      router: history(),
+      stateMapping: {
+        stateToRoute(uiState: any) {
+          const indexUiState = uiState.books || {};
+          return indexUiState;
+        },
+        routeToState(routeState: any) {
+          return {
+            books: routeState,
+          };
+        },
+      },
+    },
+    future: {
+      preserveSharedStateOnUnmount: true,
+    },
+  });
 
   /**
    * Fetches a single book by ID and its user-specific data
@@ -213,6 +173,7 @@ export class BookState {
           avgRating: book.avgRating,
           genre: book.genre,
           tags: book.tags,
+          userId: currentUser.uid,
         };
 
         // Save to user's saved books subcollection
@@ -324,337 +285,27 @@ export class BookState {
     }
   }
 
-  /**
-   * Searches books using Typesense
-   * @param query Search query string
-   * @param page Page number for pagination
-   */
-  async handleSearchResults(query: string, page: number = 1) {
-    try {
-      this.loading = true;
-      this.error = null;
-
-      const searchParameters = {
-        q: query || "*",
-        query_by: "title,authorName,description,genre,tags",
-        page,
-        per_page: this.pageSize,
-        sort_by: "_text_match:desc,avgRating:desc",
-      };
-
-      this.lastSearchParams = searchParameters;
-
-      const results = await client
-        .collections("books")
-        .documents()
-        .search(searchParameters);
-
-      const newBooks = results.hits?.map((hit) => hit.document as Book) || [];
-      this.updateBooksState(results, page, newBooks);
-    } catch (error) {
-      this.error = handleError(error).message;
-      console.error("Error searching books:", error);
-    } finally {
-      this.loading = false;
+  // New method to safely start search
+  startSearch() {
+    if (!this.searchInitialized) {
+      try {
+        this.search.start();
+        this.searchInitialized = true;
+      } catch (error) {
+        console.error("Error starting search:", error);
+      }
     }
   }
 
-  /**
-   * Gets search suggestions for autocomplete
-   * @param query Partial search query
-   * @returns Array of book suggestions
-   */
-  async getSearchSuggestions(query: string): Promise<any[]> {
-    try {
-      if (!query || query.length < 2) return [];
-
-      const searchParameters = {
-        q: query,
-        query_by: "title,authorName",
-        per_page: 5,
-        sort_by: "avgRating:desc",
-        highlight: {
-          fields: ["title", "authorName"],
-        },
-        limit: 20,
-      };
-
-      const results = await client
-        .collections("books")
-        .documents()
-        .search(searchParameters);
-
-      if (results.hits && results.hits.length > 0) {
-        return results.hits.map((hit) => hit.document);
+  // Method to safely dispose search
+  disposeSearch() {
+    if (this.searchInitialized) {
+      try {
+        this.search.dispose();
+        this.searchInitialized = false;
+      } catch (error) {
+        console.error("Error disposing search:", error);
       }
-
-      return [];
-    } catch (error) {
-      console.error("Error getting search suggestions:", error);
-      return [];
-    }
-  }
-
-  /**
-   * Sorts books by different criteria
-   * @param sortOption Sort option (newest, oldest, rating)
-   * @param page Page number for pagination
-   */
-  async sortBooks(sortOption: string, page: number = 1) {
-    try {
-      this.loading = true;
-      this.error = null;
-
-      let sortBy = "";
-      switch (sortOption) {
-        case "newest":
-          sortBy = "publishedDate:desc";
-          break;
-        case "oldest":
-          sortBy = "publishedDate:asc";
-          break;
-        case "rating":
-          sortBy = "avgRating:desc";
-          break;
-        default:
-          sortBy = "publishedDate:desc";
-      }
-
-      const searchParameters = {
-        q: "*",
-        query_by: "title",
-        sort_by: sortBy,
-        page,
-        per_page: this.pageSize,
-      };
-
-      this.lastSearchParams = searchParameters;
-
-      const results = await client
-        .collections("books")
-        .documents()
-        .search(searchParameters);
-
-      const newBooks = results.hits?.map((hit) => hit.document as Book) || [];
-      this.updateBooksState(results, page, newBooks);
-    } catch (error) {
-      this.error = handleError(error).message;
-      console.error("Error sorting books:", error);
-    } finally {
-      this.loading = false;
-    }
-  }
-
-  /**
-   * Gets facet counts for filtering options
-   * @returns Facet results or null if error
-   */
-  async getFacets(): Promise<FacetResult | null> {
-    try {
-      this.loading = true;
-
-      const searchParameters = {
-        q: "*",
-        query_by: "title",
-        facet_by: "genre, avgRating, tags",
-        per_page: 0,
-        max_facet_values: 100,
-        facet_query_num_typos: 0,
-        include_fields: "id",
-        exhaustive_faceting: true,
-      };
-
-      const results = await client
-        .collections("books")
-        .documents()
-        .search(searchParameters);
-
-      if (!results.facet_counts) {
-        return null;
-      }
-
-      // Process genre facets
-      const genres =
-        results.facet_counts
-          .find((facet) => facet.field_name === "genre")
-          ?.counts.map((item) => ({ value: item.value, count: item.count })) ||
-        [];
-
-      // Process rating facets - convert string ratings to numbers
-      const ratings =
-        results.facet_counts
-          .find((facet) => facet.field_name === "avgRating")
-          ?.counts.map((item) => ({
-            value: Math.floor(parseFloat(item.value)),
-            count: item.count,
-          }))
-          .filter((item) => item.value > 0 && item.value <= 5)
-          .reduce((acc, curr) => {
-            // Combine ratings by integer value (e.g., 4.1, 4.2, 4.3 all become 4)
-            const existing = acc.find((r) => r.value === curr.value);
-            if (existing) {
-              existing.count += curr.count;
-            } else {
-              acc.push(curr);
-            }
-            return acc;
-          }, [] as { value: number; count: number }[])
-          .sort((a, b) => b.value - a.value) || [];
-
-      // Process tag facets
-      const tags =
-        results.facet_counts
-          .find((facet) => facet.field_name === "tags")
-          ?.counts.map((item) => ({ value: item.value, count: item.count })) ||
-        [];
-
-      return { genres, ratings, tags };
-    } catch (error) {
-      console.error("Error fetching facets:", error);
-      return null;
-    } finally {
-      this.loading = false;
-    }
-  }
-
-  /**
-   * Filters books by genres, ratings, and tags
-   * @param genres Array of genres to filter by
-   * @param ratings Array of ratings to filter by
-   * @param tags Array of tags to filter by
-   * @param page Page number for pagination
-   */
-  async filterBooks(
-    genres: string[],
-    ratings: number[],
-    tags: string[],
-    page: number = 1
-  ) {
-    try {
-      this.loading = true;
-      this.error = null;
-
-      const filters: string[] = [];
-
-      if (genres.length > 0) {
-        const genreFilters = genres
-          .map((genre) => "genre:=" + genre)
-          .join(" || ");
-        filters.push("(" + genreFilters + ")");
-      }
-
-      if (ratings.length > 0) {
-        const ratingFilters = ratings
-          .map(
-            (rating) =>
-              "avgRating:>=" + rating + " && avgRating:<" + (rating + 1)
-          )
-          .join(" || ");
-        filters.push("(" + ratingFilters + ")");
-      }
-
-      if (tags.length > 0) {
-        const tagFilters = tags.map((tag) => "tags:=" + tag).join(" || ");
-        filters.push("(" + tagFilters + ")");
-      }
-
-      // Search parameters for Typesense
-      const searchParameters = {
-        q: "*", // Match all documents
-        query_by: "title", // Required field
-        filter_by: filters.join(" && ") || "", // Apply filters if any
-        facet_by: "genre, avgRating, tags", // Request facets for counts
-        sort_by: "avgRating:desc", // Default sorting
-        per_page: this.pageSize,
-        page,
-      };
-
-      this.lastSearchParams = searchParameters;
-
-      const results = await client
-        .collections("books")
-        .documents()
-        .search(searchParameters);
-
-      const newBooks = results.hits?.map((hit) => hit.document as Book) || [];
-      this.updateBooksState(results, page, newBooks);
-    } catch (error) {
-      this.error = handleError(error).message;
-      console.error("Error filtering books:", error);
-    } finally {
-      this.loading = false;
-    }
-  }
-
-  /**
-   * Loads more books based on the last search parameters
-   */
-  async loadMore() {
-    if (!this.hasMoreResults || this.loading) return;
-
-    const nextPage = this.currentPage + 1;
-    const currentCount = this.books.length;
-
-    try {
-      this.loading = true;
-
-      if (this.lastSearchParams) {
-        // Create a new params object with the updated page number
-        const params = { ...this.lastSearchParams, page: nextPage };
-
-        // Execute the appropriate search method based on the params
-        let results;
-        if (params.filter_by) {
-          // This is a filter operation
-          results = await client
-            .collections("books")
-            .documents()
-            .search(params);
-        } else if (params.q && params.q !== "*") {
-          // This is a search operation
-          results = await client
-            .collections("books")
-            .documents()
-            .search(params);
-        } else if (params.sort_by) {
-          // This is a sort operation
-          results = await client
-            .collections("books")
-            .documents()
-            .search(params);
-        } else {
-          // Default search
-          results = await client
-            .collections("books")
-            .documents()
-            .search(params);
-        }
-
-        // Process the results
-        const newBooks = results.hits?.map((hit) => hit.document as Book) || [];
-
-        // Update the books state with the new results
-        if (newBooks.length > 0) {
-          this.books = this.deduplicateBooks([...this.books, ...newBooks]);
-          this.currentPage = nextPage;
-          this.totalHits = results.found;
-          this.hasMoreResults = this.books.length < this.totalHits;
-        } else {
-          // No more results
-          this.hasMoreResults = false;
-        }
-
-        // If no new books were added but we still have more results according to totalHits,
-        // there might be duplicates - try the next page
-        if (currentCount === this.books.length && this.hasMoreResults) {
-          await this.loadMore();
-        }
-      }
-    } catch (error) {
-      this.error = handleError(error).message;
-      console.error("Error loading more books:", error);
-    } finally {
-      this.loading = false;
     }
   }
 }

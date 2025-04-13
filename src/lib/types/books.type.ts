@@ -44,6 +44,7 @@ export interface SavedBook {
   avgRating: number; // Average rating of the book
   genre: string; // Primary genre of the book
   tags: string[]; // Array of tags/categories associated with the book
+  userId: string; // ID of the user who saved the book
 }
 
 /**

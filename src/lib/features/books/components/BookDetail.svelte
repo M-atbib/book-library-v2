@@ -44,6 +44,13 @@
 
 <div class="grid grid-cols-3 gap-6 p-4">
   <div class="md:col-span-2 space-y-6">
+    <div class="text-sm breadcrumbs mb-4">
+      <ul>
+        <li><a href="/books">Books</a></li>
+        <li>{bookState.book?.book.title}</li>
+      </ul>
+    </div>
+
     <div class="flex justify-between items-center">
       <h1 class="text-3xl font-bold text-primary">
         {bookState.book?.book.title}

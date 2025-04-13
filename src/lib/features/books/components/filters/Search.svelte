@@ -4,11 +4,15 @@
   import { onMount } from "svelte";
   import { connectAutocomplete } from "instantsearch.js/es/connectors";
   import { goto } from "$app/navigation";
+  import { history } from "instantsearch.js/es/lib/routers";
 
   // Create a separate instance for autocomplete that won't affect the main search
   let autocompleteSearch = instantsearch({
     indexName: "books",
     searchClient,
+    routing: {
+      router: history({ cleanUrlOnDispose: true }),
+    },
     future: {
       preserveSharedStateOnUnmount: true,
     },
@@ -55,8 +59,8 @@
               // Redirect to search page with the query parameter
               goto(`/search-book?q=${encodeURIComponent(searchTerm)}`);
               // Clear the input after search
-              (event.target as HTMLInputElement).value = '';
-              refine('');
+              (event.target as HTMLInputElement).value = "";
+              refine("");
             }
           }
         });
@@ -183,13 +187,11 @@
 
 <div class="w-full">
   <div bind:this={searchContainer} class="w-full p-4">
-    <div id="stats" class="hidden"></div>
     {#if totalHits > 0}
       <p class="text-base-content/70 mb-4">
         Showing {displayedHits} of {totalHits} books
       </p>
     {/if}
     <div id="autocomplete" class="mb-6"></div>
-    <div id="hits" class="mt-4"></div>
   </div>
 </div>

@@ -7,12 +7,12 @@
   const authorState = getAuthorState();
 
   onMount(() => {
-    authorState.fetchPublishedBooks();
-  });
+    authorState.initializeSearch();
 
-  function loadMoreBooks() {
-    authorState.fetchPublishedBooks(true);
-  }
+    return () => {
+      authorState.disposeSearch();
+    };
+  });
 
   async function handleDeleteBook(bookId: string) {
     if (confirm("Are you sure you want to delete this book?")) {
@@ -21,7 +21,7 @@
   }
 
   function clearError() {
-    authorState.error = null;
+    authorState.clearError();
   }
 </script>
 
@@ -40,7 +40,12 @@
     </div>
   {/if}
 
-  {#if authorState.publishedBooks.length === 0}
+  <!-- Search interface -->
+  <div class="mb-6">
+    <div class="relative mb-4" id="searchbox"></div>
+  </div>
+
+  {#if authorState.searchResults.length === 0}
     <div class="alert alert-info">
       <span>You haven't published any books yet.</span>
     </div>
@@ -58,7 +63,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each authorState.publishedBooks as book}
+          {#each authorState.searchResults as book}
             <tr>
               <td class="w-16">
                 {#if book.coverUrl}
@@ -78,7 +83,7 @@
               <td>{book.title}</td>
               <td>{book.genre}</td>
               <td>{formatDate(book.publishedDate)}</td>
-              <td>{book.avgRating}</td>
+              <td>{book.avgRating || "N/A"}</td>
               <td>
                 <PublishNewBook mode="edit" initialBook={book} />
                 <button
@@ -92,14 +97,29 @@
           {/each}
         </tbody>
       </table>
-    </div>
 
-    {#if authorState.publishedBooksPagination.hasNextPage}
-      <div class="flex justify-center mt-6">
-        <button class="btn btn-primary" onclick={loadMoreBooks}>
-          Load More
-        </button>
-      </div>
-    {/if}
+      <!-- Pagination -->
+      {#if authorState.totalPages > 1}
+        <div class="flex justify-center mt-4">
+          <div class="join">
+            <button 
+              class="join-item btn" 
+              onclick={() => authorState.handlePageChange(authorState.currentPage - 1)}
+              disabled={authorState.currentPage === 1}
+            >
+              «
+            </button>
+            <button class="join-item btn">Page {authorState.currentPage}</button>
+            <button 
+              class="join-item btn"
+              onclick={() => authorState.handlePageChange(authorState.currentPage + 1)}
+              disabled={authorState.currentPage === authorState.totalPages}
+            >
+              »
+            </button>
+          </div>
+        </div>
+      {/if}
+    </div>
   {/if}
 </div>

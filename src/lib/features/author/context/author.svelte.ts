@@ -27,6 +27,10 @@ import { getContext } from "svelte";
 import { setContext } from "svelte";
 import { toFirestoreTimestamp } from "$lib/utils/dateFormatting";
 import type { UserRole } from "$lib/types/user.type";
+import { searchClient } from "$lib/services/typesense";
+import instantsearch from "instantsearch.js/es/index";
+import { searchBox, configure } from "instantsearch.js/es/widgets";
+import { connectHits, connectPagination } from "instantsearch.js/es/connectors";
 
 /**
  * Pagination state interface for book listings
@@ -56,6 +60,86 @@ export class AuthorState {
     lastVisible: null,
     pageSize: 10,
   });
+
+  // Search state
+  searchInstance: any = null;
+  searchResults = $state<Book[]>([]);
+  currentPage = $state(1);
+  totalPages = $state(0);
+  refineFunction: ((page: number) => void) | null = null;
+
+  /**
+   * Initializes the search functionality
+   */
+  initializeSearch() {
+    if (!auth.currentUser) return;
+
+    const authorId = auth.currentUser.uid;
+
+    this.searchInstance = instantsearch({
+      indexName: "books",
+      searchClient,
+    });
+
+    const customHits = connectHits(({ hits }) => {
+      this.searchResults = hits as unknown as Book[];
+    });
+
+    const customPagination = connectPagination(
+      ({ currentRefinement, nbPages, refine }) => {
+        this.currentPage = currentRefinement;
+        this.totalPages = nbPages;
+        this.refineFunction = refine;
+      }
+    );
+
+    this.searchInstance.addWidgets([
+      configure({
+        filters: `authorId:${authorId}`,
+        hitsPerPage: 10,
+      }),
+      searchBox({
+        container: "#searchbox",
+        placeholder: "Search your books",
+        cssClasses: {
+          input: "input input-bordered w-full",
+          submit: "btn btn-ghost absolute right-0 top-0",
+          reset: "btn btn-ghost absolute right-12 top-0",
+        },
+      }),
+      customHits({}),
+      customPagination({}),
+    ]);
+
+    this.searchInstance.start();
+  }
+
+  /**
+   * Disposes of the search instance
+   */
+  disposeSearch() {
+    if (this.searchInstance) {
+      this.searchInstance.dispose();
+    }
+  }
+
+  /**
+   * Handles page changes in search results
+   */
+  handlePageChange(newPage: number) {
+    if (this.refineFunction) {
+      this.refineFunction(newPage);
+    }
+  }
+
+  /**
+   * Refreshes the search results
+   */
+  refreshSearch() {
+    if (this.searchInstance) {
+      this.searchInstance.refresh();
+    }
+  }
 
   /**
    * Fetches books published by the current user with pagination support
@@ -215,8 +299,8 @@ export class AuthorState {
 
       // Note: Cloud function will handle removing from savedBooks collections
 
-      // Refresh published books
-      await this.fetchPublishedBooks();
+      // Refresh search results after deletion
+      this.refreshSearch();
 
       return true;
     } catch (error) {
@@ -324,6 +408,13 @@ export class AuthorState {
       this.error = handleError(error).message;
       return null;
     }
+  }
+
+  /**
+   * Clears any error messages
+   */
+  clearError() {
+    this.error = null;
   }
 }
 

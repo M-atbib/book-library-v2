@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
   import type { Book, SavedBook } from "$lib/types/books.type";
   import { Star, X } from "@lucide/svelte";
 

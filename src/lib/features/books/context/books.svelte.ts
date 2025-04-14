@@ -24,9 +24,8 @@ import {
 import { handleError } from "$lib/utils/errorHandling";
 import { auth, db } from "$lib/services/firebase";
 import instantsearch from "instantsearch.js";
-import { client, searchClient } from "$lib/services/typesense";
+import { searchClient } from "$lib/services/typesense";
 import { history } from "instantsearch.js/es/lib/routers";
-import type { UiState } from "instantsearch.js";
 
 /**
  * BookState class that manages all book-related state and operations

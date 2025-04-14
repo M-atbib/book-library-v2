@@ -151,12 +151,6 @@
       widgetsAdded = true;
     }
   });
-
-  // Keep this to prevent memory leaks, but don't dispose the search instance
-  onDestroy(() => {
-    // We intentionally don't dispose the search instance here
-    // This is key to preserving state between navigations
-  });
 </script>
 
 <div class="p-4">

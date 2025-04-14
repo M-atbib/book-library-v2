@@ -33,6 +33,10 @@ export const guards: Record<string, RouteGuard> = {
     requireAuth: true,
     redirectTo: "/",
   },
+  "/search-book": {
+    requireAuth: true,
+    redirectTo: "/",
+  },
 };
 
 export async function checkRouteAccess(path: string): Promise<boolean> {

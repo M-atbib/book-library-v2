@@ -297,8 +297,6 @@ export class AuthorState {
       // Delete the book
       await deleteDoc(bookRef);
 
-      // Note: Cloud function will handle removing from savedBooks collections
-
       // Refresh search results after deletion
       this.refreshSearch();
 

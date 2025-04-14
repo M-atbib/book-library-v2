@@ -56,12 +56,42 @@ const typesenseInstantsearchAdapter = new TypesenseInstantsearchAdapter({
     facet_sample_percent: 20,
     highlight_full_fields: "title,authorName,genre,tags",
     facet_by: "avgRating,genre,tags",
-    max_facet_values: 20,
+    max_facet_values: 500,
   },
   filterByOptions: {
     genre: { exactMatch: true },
-    tags: { exactMatch: false },
-    avgRating: { exactMatch: false },
+    tags: { exactMatch: true },
+    avgRating: { exactMatch: true },
   },
 });
 export const searchClient = typesenseInstantsearchAdapter.searchClient;
+
+const typesenseInstantsearchAdapterSuggestions =
+  new TypesenseInstantsearchAdapter({
+    server: {
+      apiKey: import.meta.env.VITE_TYPESENSE_SEARCH_ONLY_API_KEY,
+      nodes: [
+        {
+          host: import.meta.env.VITE_TYPESENSE_HOST,
+          port: parseInt(import.meta.env.VITE_TYPESENSE_PORT),
+          protocol: import.meta.env.VITE_TYPESENSE_PROTOCOL,
+        },
+      ],
+      cacheSearchResultsForSeconds: 2 * 60,
+    },
+    additionalSearchParameters: {
+      query_by: "title,authorName,genre",
+      prefix: true,
+      group_by: "title",
+      group_limit: 1,
+      per_page: 5,
+      highlight_full_fields: "title,authorName,genre",
+    },
+    filterByOptions: {
+      genre: { exactMatch: true },
+      tags: { exactMatch: false },
+      avgRating: { exactMatch: false },
+    },
+  });
+export const searchClientSuggestions =
+  typesenseInstantsearchAdapterSuggestions.searchClient;

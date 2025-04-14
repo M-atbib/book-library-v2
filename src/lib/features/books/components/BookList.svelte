@@ -4,31 +4,48 @@
   import { SortBy, Facet, getBookState } from "$lib/features";
   import { browser } from "$app/environment";
   import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
 
+  const STORAGE_KEY = "book_filter_state";
   const bookState = getBookState();
   let widgetsAdded = false;
+  let clickListener: ((e: MouseEvent) => void) | null = null;
+  let popStateListener: (() => void) | null = null;
 
   // Watch page changes to handle navigation
   $effect(() => {
     if ($page && browser) {
-      // When we're on the books page, ensure search is started
-      if (
-        $page.url.pathname.includes("/books") &&
-        !bookState.searchInitialized
-      ) {
-        bookState.startSearch();
+      // When we're on the books page, ensure search is started and restore filters
+      if ($page.url.pathname.includes("/books")) {
+        if (!bookState.searchInitialized) {
+          bookState.startSearch();
+          
+          // Try to restore saved filters from localStorage
+          const savedState = localStorage.getItem(STORAGE_KEY);
+          if (savedState) {
+            try {
+              const parsedState = JSON.parse(savedState);
+              bookState.search.setUiState({ books: parsedState });
+            } catch (error) {
+              console.error("Error restoring filters from localStorage:", error);
+            }
+          }
+        }
       }
     }
   });
 
-  onMount(() => {
-    if (!browser) return;
-
-    // Start search if not already started
-    if (!bookState.searchInitialized) {
-      bookState.startSearch();
+  // Function to save current filter state to localStorage
+  function saveFilterState(): void {
+    if (browser && bookState.searchInitialized) {
+      const currentState = bookState.search.getUiState().books || {};
+      if (Object.keys(currentState).length > 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentState));
+      }
     }
+  }
 
+  onMount(() => {
     // Add analytics middleware only once
     const analyticsMiddleware = () => {
       return {
@@ -55,6 +72,66 @@
     };
 
     bookState.search.use(analyticsMiddleware);
+
+    // Set up a middleware to save state changes
+    // Using the general middleware pattern instead of mainIndex.use
+    bookState.search.use(() => {
+      return {
+        onStateChange({ uiState }) {
+          if (browser && $page.url.pathname.includes("/books")) {
+            // Only save when we're on the books page
+            const currentState = uiState.books || {};
+            if (Object.keys(currentState).length > 0) {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(currentState));
+            }
+          }
+        },
+        subscribe() {},
+        unsubscribe() {},
+      };
+    });
+
+    // Handle link click navigation for book details
+    clickListener = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const bookLink = target.closest('a[href^="/books/"]');
+      
+      if (bookLink && !e.ctrlKey && !e.metaKey && !e.shiftKey && bookLink.getAttribute('href') !== '/books') {
+        // It's a book detail link being clicked
+        e.preventDefault();
+        const href = bookLink.getAttribute('href');
+        if (href) {
+          // Save current filter state before navigating to detail page
+          saveFilterState();
+          
+          // Navigate programmatically with replaceState:true to avoid history stacking
+          goto(href, { 
+            keepFocus: true, 
+            noScroll: false, 
+            replaceState: true  // Change this to true to avoid adding to browser history stack
+          });
+        }
+      }
+    };
+    
+    document.addEventListener('click', clickListener);
+
+    // Also handle popstate events (browser back/forward buttons)
+    popStateListener = () => {
+      if (browser && $page.url.pathname.includes("/books") && bookState.searchInitialized) {
+        const savedState = localStorage.getItem(STORAGE_KEY);
+        if (savedState) {
+          try {
+            const parsedState = JSON.parse(savedState);
+            bookState.search.setUiState({ books: parsedState });
+          } catch (error) {
+            console.error("Error restoring filters from localStorage:", error);
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('popstate', popStateListener);
 
     // Only add widgets once
     if (!widgetsAdded) {
@@ -150,12 +227,21 @@
 
       widgetsAdded = true;
     }
+    bookState.search.start();
+  });
+
+  onDestroy(() => {
+    // Clean up event listeners and subscriptions
+    if (browser) {
+      if (clickListener) document.removeEventListener('click', clickListener);
+      if (popStateListener) window.removeEventListener('popstate', popStateListener);
+    }
   });
 </script>
 
 <div class="p-4">
   <div class="flex gap-4">
-    <Facet />
+    <Facet search={bookState.search} />
 
     <div class="w-5/6 flex-1">
       <div class="flex justify-between gap-4">

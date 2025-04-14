@@ -11,6 +11,7 @@
   let { book, isSaved = false, onRemoveSaved }: BookCardProps = $props();
 
   function handleRemove(event: MouseEvent) {
+    event.preventDefault(); // Prevent navigation
     event.stopPropagation();
     if (onRemoveSaved) {
       onRemoveSaved(book.id);
@@ -43,7 +44,7 @@
     </div>
     {#if isSaved}
       <button
-        class="absolute top-2 left-2 bg-error text-white rounded-full p-1 hover:bg-error-focus"
+        class="absolute top-2 left-2 bg-error text-white rounded-full p-1 hover:bg-error-focus z-10 cursor-pointer"
         onclick={handleRemove}
         aria-label="Remove from saved books"
       >

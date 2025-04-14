@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { getBookState } from "$lib/features";
+  import { getBookState, getReaderState } from "$lib/features";
   import { formatDate } from "$lib/utils/dateFormatting";
   import { BookmarkCheck, BookmarkPlus, Loader, Star } from "@lucide/svelte";
 
   const bookState = getBookState();
+  const readerState = getReaderState();
   let userRating = $state(0);
 
   // Update userRating whenever bookState.book.rating changes

@@ -6,9 +6,8 @@
     clearRefinements,
     ratingMenu,
   } from "instantsearch.js/es/widgets";
-  import { getBookState } from "$lib/features";
 
-  const bookState = getBookState();
+  const { search } = $props();
 
   function createStarRating(rating: number, max: number = 5): string {
     let stars = "";
@@ -23,7 +22,7 @@
   }
 
   onMount(() => {
-    bookState.search.addWidgets([
+    search.addWidgets([
       refinementList({
         container: "#genre-refinement-list",
         attribute: "genre",
@@ -106,7 +105,6 @@
                       data-facet-count="${count}"
                     />
                     <span class="flex items-center">${stars} & Up</span>
-                    <span class="ml-auto badge badge-xs" data-facet-count-display>1000</span>
                   </label>
                 `;
           },

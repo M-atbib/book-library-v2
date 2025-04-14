@@ -36,7 +36,12 @@
 
   <!-- Search interface -->
   <div class="mb-6">
-    <div class="relative mb-4" id="searchbox"></div>
+    <div
+      class="relative mb-4"
+      id="searchbox"
+      class:hidden={!readerState.loading &&
+        readerState.searchResults.length === 0}
+    ></div>
   </div>
 
   {#if readerState.loading}
@@ -60,17 +65,19 @@
     {#if readerState.totalPages > 1}
       <div class="flex justify-center mt-4">
         <div class="join">
-          <button 
-            class="join-item btn" 
-            onclick={() => readerState.handlePageChange(readerState.currentPage - 1)}
+          <button
+            class="join-item btn"
+            onclick={() =>
+              readerState.handlePageChange(readerState.currentPage - 1)}
             disabled={readerState.currentPage === 1}
           >
             «
           </button>
           <button class="join-item btn">Page {readerState.currentPage}</button>
-          <button 
+          <button
             class="join-item btn"
-            onclick={() => readerState.handlePageChange(readerState.currentPage + 1)}
+            onclick={() =>
+              readerState.handlePageChange(readerState.currentPage + 1)}
             disabled={readerState.currentPage === readerState.totalPages}
           >
             »

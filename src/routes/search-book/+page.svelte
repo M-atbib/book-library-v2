@@ -6,7 +6,7 @@
   import { connectHits } from "instantsearch.js/es/connectors";
   import { searchClient } from "$lib/services/typesense";
   import { NoContent } from "$lib/components";
-  import { BookCard } from "$lib/features";
+  import { BookCard, Facet } from "$lib/features";
   import type { Book } from "$lib/types/books.type";
 
   // Get search query from URL params
@@ -87,7 +87,7 @@
   <title>Book Library | Search Results</title>
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8">
+<div class="">
   <h1 class="text-2xl font-bold mb-6">Search Books</h1>
 
   <div class="mb-8">
@@ -100,9 +100,12 @@
     </div>
   {/if}
 
-  <div class="flex flex-col md:flex-row gap-6">
+  <div class="flex flex-row gap-6">
+    <!-- Facets -->
+    <Facet {search} />
+
     <!-- Search results -->
-    <div class="flex-grow">
+    <div class="w-5/6">
       {#if loading && books.length === 0}
         <div class="flex justify-center my-12">
           <span class="loading loading-spinner loading-lg"></span>

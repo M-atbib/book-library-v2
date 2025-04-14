@@ -43,27 +43,9 @@ export class BookState {
 
   // Track if search has been initialized
   searchInitialized = $state<boolean>(false);
-
   search = instantsearch({
     indexName: "books",
     searchClient,
-    routing: {
-      router: history(),
-      stateMapping: {
-        stateToRoute(uiState: any) {
-          const indexUiState = uiState.books || {};
-          return indexUiState;
-        },
-        routeToState(routeState: any) {
-          return {
-            books: routeState,
-          };
-        },
-      },
-    },
-    future: {
-      preserveSharedStateOnUnmount: true,
-    },
   });
 
   /**
@@ -76,8 +58,7 @@ export class BookState {
       this.loading = true;
       this.error = null;
 
-      const bookRef = doc(db, "books", id);
-      const bookDoc = await getDoc(bookRef);
+      const bookDoc = await getDoc(doc(db, "books", id));
 
       if (!bookDoc.exists()) {
         this.error = "Book not found";
@@ -91,30 +72,25 @@ export class BookState {
 
       // Get user's rating if logged in
       let rating: BookRating | null = null;
-      const currentUser = auth.currentUser;
 
-      if (currentUser) {
-        const ratingRef = doc(db, "books", id, "ratings", currentUser.uid);
-        const ratingDoc = await getDoc(ratingRef);
+      if (auth.currentUser) {
+        const ratingDoc = await getDoc(
+          doc(db, "books", id, "ratings", auth.currentUser.uid)
+        );
 
         if (ratingDoc.exists()) {
           rating = ratingDoc.data() as BookRating;
         } else {
           rating = {
             ratingValue: 0,
-            userId: currentUser.uid,
+            userId: auth.currentUser.uid,
           };
         }
 
         // Check if book is saved by the user
-        const savedBookRef = doc(
-          db,
-          "users",
-          currentUser.uid,
-          "savedBooks",
-          id
+        const savedBookDoc = await getDoc(
+          doc(db, "users", auth.currentUser.uid, "savedBooks", id)
         );
-        const savedBookDoc = await getDoc(savedBookRef);
         this.isBookSaved = savedBookDoc.exists();
       } else {
         this.isBookSaved = false;
@@ -143,8 +119,7 @@ export class BookState {
       this.loading = true;
       this.error = null;
 
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
+      if (!auth.currentUser) {
         this.error = "User not authenticated";
         return false;
       }
@@ -152,7 +127,7 @@ export class BookState {
       const savedBookRef = doc(
         db,
         "users",
-        currentUser.uid,
+        auth.currentUser.uid,
         "savedBooks",
         book.id
       );
@@ -172,7 +147,7 @@ export class BookState {
           avgRating: book.avgRating,
           genre: book.genre,
           tags: book.tags,
-          userId: currentUser.uid,
+          userId: auth.currentUser.uid,
         };
 
         // Save to user's saved books subcollection
@@ -201,8 +176,7 @@ export class BookState {
       this.loading = true;
       this.error = null;
 
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
+      if (!auth.currentUser) {
         this.error = "User not authenticated";
         return false;
       }
@@ -210,7 +184,7 @@ export class BookState {
       // Create rating object
       const bookRating: BookRating = {
         ratingValue: rating,
-        userId: currentUser.uid,
+        userId: auth.currentUser.uid,
       };
 
       // Get the book reference
@@ -227,7 +201,13 @@ export class BookState {
       const currentRatingCount = bookData.ratingCount || 0;
 
       // Check if user has already rated this book
-      const ratingRef = doc(db, "books", bookId, "ratings", currentUser.uid);
+      const ratingRef = doc(
+        db,
+        "books",
+        bookId,
+        "ratings",
+        auth.currentUser.uid
+      );
       const ratingDoc = await getDoc(ratingRef);
       const isNewRating = !ratingDoc.exists();
       const previousRating = isNewRating

@@ -40,14 +40,26 @@
     </div>
   {/if}
 
-  <!-- Search interface -->
+  <!-- Search interface - hide if no books -->
   <div class="mb-6">
-    <div class="relative mb-4" id="searchbox"></div>
+    <div
+      class="relative mb-4"
+      id="searchbox"
+      class:hidden={authorState.totalPublishedBooks === 0}
+    ></div>
   </div>
 
-  {#if authorState.searchResults.length === 0}
+  {#if authorState.loading && !authorState.searchResults.length}
+    <div class="flex justify-center items-center h-64">
+      <span class="loading loading-spinner loading-lg"></span>
+    </div>
+  {:else if authorState.totalPublishedBooks === 0}
     <div class="alert alert-info">
       <span>You haven't published any books yet.</span>
+    </div>
+  {:else if authorState.searchResults.length === 0}
+    <div class="alert alert-info">
+      <p>No books found matching your search.</p>
     </div>
   {:else}
     <div class="overflow-x-auto">

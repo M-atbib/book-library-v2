@@ -46,12 +46,12 @@ const typesenseInstantsearchAdapter = new TypesenseInstantsearchAdapter({
         protocol: import.meta.env.VITE_TYPESENSE_PROTOCOL,
       },
     ],
-    cacheSearchResultsForSeconds: 2 * 60,
+    cacheSearchResultsForSeconds: 2,
   },
   additionalSearchParameters: {
     query_by: "title,authorName,genre,tags",
     query_by_weights: "2,2,2,2",
-    sort_by: "_text_match:desc",
+    sort_by: "_text_match:desc, publishedDate:desc",
     facet_sample_threshold: 1000,
     facet_sample_percent: 20,
     highlight_full_fields: "title,authorName,genre,tags",
@@ -95,3 +95,23 @@ const typesenseInstantsearchAdapterSuggestions =
   });
 export const searchClientSuggestions =
   typesenseInstantsearchAdapterSuggestions.searchClient;
+
+const typesenseInstantsearchAdapterSavedBooks =
+  new TypesenseInstantsearchAdapter({
+    server: {
+      apiKey: import.meta.env.VITE_TYPESENSE_SEARCH_ONLY_API_KEY,
+      nodes: [
+        {
+          host: import.meta.env.VITE_TYPESENSE_HOST,
+          port: parseInt(import.meta.env.VITE_TYPESENSE_PORT),
+          protocol: import.meta.env.VITE_TYPESENSE_PROTOCOL,
+        },
+      ],
+      cacheSearchResultsForSeconds: 2,
+    },
+    additionalSearchParameters: {
+      query_by: "title,authorName,genre,tags",
+    },
+  });
+export const searchClientSavedBooks =
+  typesenseInstantsearchAdapterSavedBooks.searchClient;

@@ -2,10 +2,15 @@
   import { getBookState, getReaderState } from "$lib/features";
   import { formatDate } from "$lib/utils/dateFormatting";
   import { BookmarkCheck, BookmarkPlus, Loader, Star } from "@lucide/svelte";
+  import { auth } from "$lib/services/firebase";
+  import { onMount } from "svelte";
 
   const bookState = getBookState();
-  const readerState = getReaderState();
   let userRating = $state(0);
+
+  onMount(async () => {
+    await bookState.getRole();
+  });
 
   // Update userRating whenever bookState.book.rating changes
   $effect(() => {
@@ -123,28 +128,30 @@
           </div>
         </div>
 
-        <div class="space-y-2">
-          <h4 class="text-sm font-semibold text-base-content/70">
-            Your Rating
-          </h4>
-          <div class="flex gap-1 text-warning">
-            {#each Array(5) as _, i}
-              <button
-                class="btn btn-ghost btn-sm p-0"
-                onclick={() => rateBook(i + 1)}
-                disabled={bookState.loading}
-              >
-                <Star
-                  class="w-6 h-6"
-                  fill={i < userRating ? "currentColor" : "none"}
-                />
-              </button>
-            {/each}
+        {#if bookState.role !== "author"}
+          <div class="space-y-2">
+            <h4 class="text-sm font-semibold text-base-content/70">
+              Your Rating
+            </h4>
+            <div class="flex gap-1 text-warning">
+              {#each Array(5) as _, i}
+                <button
+                  class="btn btn-ghost btn-sm p-0"
+                  onclick={() => rateBook(i + 1)}
+                  disabled={bookState.loading}
+                >
+                  <Star
+                    class="w-6 h-6"
+                    fill={i < userRating ? "currentColor" : "none"}
+                  />
+                </button>
+              {/each}
+            </div>
+            {#if bookState.loading}
+              <p class="text-xs text-base-content/70">Rating book...</p>
+            {/if}
           </div>
-          {#if bookState.loading}
-            <p class="text-xs text-base-content/70">Rating book...</p>
-          {/if}
-        </div>
+        {/if}
       </div>
     </div>
   </div>

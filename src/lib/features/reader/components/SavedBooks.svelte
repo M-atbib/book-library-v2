@@ -13,6 +13,10 @@
     };
   });
 
+  $effect(() => {
+    readerState.fetchSavedBooks();
+  });
+
   function handleRemoveSaved(bookId: string) {
     readerState.removeSavedBook(bookId);
   }
@@ -39,8 +43,7 @@
     <div
       class="relative mb-4"
       id="searchbox"
-      class:hidden={!readerState.loading &&
-        readerState.searchResults.length === 0}
+      class:hidden={readerState.totalSavedBooks === 0}
     ></div>
   </div>
 
@@ -48,9 +51,13 @@
     <div class="flex justify-center items-center h-64">
       <span class="loading loading-spinner loading-lg"></span>
     </div>
-  {:else if readerState.searchResults.length === 0}
+  {:else if readerState.totalSavedBooks === 0}
     <div class="alert alert-info">
       <p>You haven't saved any books yet.</p>
+    </div>
+  {:else if readerState.searchResults.length === 0}
+    <div class="alert alert-info">
+      <p>No books found matching your search.</p>
     </div>
   {:else}
     <div

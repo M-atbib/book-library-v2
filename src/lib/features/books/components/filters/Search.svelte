@@ -14,9 +14,6 @@
   let autocompleteSearch = instantsearch({
     indexName: "books",
     searchClient,
-    routing: {
-      router: history({ cleanUrlOnDispose: true }),
-    },
     future: {
       preserveSharedStateOnUnmount: true,
     },
@@ -232,12 +229,12 @@
                   input.value = "";
                   suggestionsDiv.classList.add("hidden");
                   refine("");
-                  
+
                   // Get current path
                   const currentPath = $page.url.pathname;
-                  
+
                   // If we're already on a book details page, use window.location for hard refresh
-                  if (currentPath.startsWith('/books/')) {
+                  if (currentPath.startsWith("/books/")) {
                     window.location.href = `/books/${hit.id}`;
                   } else {
                     // Otherwise use goto for SPA navigation

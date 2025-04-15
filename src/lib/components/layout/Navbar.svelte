@@ -3,8 +3,12 @@
   import { Logo } from "$lib/components";
   import { LogOut, User } from "@lucide/svelte";
   import { Search } from "$lib/features";
+  import { onMount } from "svelte";
 
   const context = getUserState();
+  onMount(async () => {
+    await context.getRole();
+  });
 </script>
 
 <nav class="navbar max-w-[90%] mx-auto py-8">

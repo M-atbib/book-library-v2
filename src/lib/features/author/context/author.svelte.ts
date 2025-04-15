@@ -12,15 +12,12 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   query,
   where,
-  limit,
-  startAfter,
-  orderBy,
   addDoc,
   updateDoc,
   deleteDoc,
+  getCountFromServer,
 } from "firebase/firestore";
 import { handleError } from "$lib/utils/errorHandling";
 import { getContext } from "svelte";
@@ -33,40 +30,27 @@ import { searchBox, configure } from "instantsearch.js/es/widgets";
 import { connectHits, connectPagination } from "instantsearch.js/es/connectors";
 
 /**
- * Pagination state interface for book listings
- */
-interface Pagination {
-  currentPage: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  lastVisible: any;
-  pageSize: number;
-}
-
-/**
  * AuthorState class that manages all author-related state and operations
  */
 export class AuthorState {
-  publishedBooks = $state<Book[]>([]);
   loading = $state<boolean>(false);
   error = $state<string | null>(null);
   role = $state<UserRole | null>(null);
-  publishedBooksPagination = $state<Pagination>({
-    currentPage: 1,
-    totalPages: 0,
-    hasNextPage: false,
-    hasPreviousPage: false,
-    lastVisible: null,
-    pageSize: 10,
-  });
 
   // Search state
-  searchInstance: any = null;
+  searchInstance = instantsearch({
+    indexName: "books",
+    searchClient,
+    future: {
+      preserveSharedStateOnUnmount: true,
+    },
+  });
+
   searchResults = $state<Book[]>([]);
   currentPage = $state(1);
   totalPages = $state(0);
   refineFunction: ((page: number) => void) | null = null;
+  totalPublishedBooks = $state(0);
 
   /**
    * Initializes the search functionality
@@ -75,11 +59,6 @@ export class AuthorState {
     if (!auth.currentUser) return;
 
     const authorId = auth.currentUser.uid;
-
-    this.searchInstance = instantsearch({
-      indexName: "books",
-      searchClient,
-    });
 
     const customHits = connectHits(({ hits }) => {
       this.searchResults = hits as unknown as Book[];
@@ -112,6 +91,29 @@ export class AuthorState {
     ]);
 
     this.searchInstance.start();
+
+    // Fetch total book count
+    this.fetchTotalPublishedBooks();
+  }
+
+  /**
+   * Fetches the total number of published books by the current user
+   */
+  async fetchTotalPublishedBooks() {
+    if (!auth.currentUser) {
+      this.error = "User not authenticated";
+      return;
+    }
+
+    try {
+      const userId = auth.currentUser.uid;
+      const booksRef = collection(db, "books");
+      const q = query(booksRef, where("authorId", "==", userId));
+      const snapshot = await getCountFromServer(q);
+      this.totalPublishedBooks = snapshot.data().count;
+    } catch (error) {
+      this.error = handleError(error).message;
+    }
   }
 
   /**
@@ -142,86 +144,6 @@ export class AuthorState {
   }
 
   /**
-   * Fetches books published by the current user with pagination support
-   * @param loadMore Whether to load more books or refresh the list
-   */
-  async fetchPublishedBooks(loadMore = false) {
-    if (!auth.currentUser) {
-      this.error = "User not authenticated";
-      return;
-    }
-
-    try {
-      this.loading = true;
-      this.error = null;
-
-      const userId = auth.currentUser.uid;
-      const booksRef = collection(db, "books");
-
-      let booksQuery;
-
-      if (loadMore && this.publishedBooksPagination.lastVisible) {
-        booksQuery = query(
-          booksRef,
-          where("authorId", "==", userId),
-          orderBy("publishedDate", "desc"),
-          startAfter(this.publishedBooksPagination.lastVisible),
-          limit(this.publishedBooksPagination.pageSize)
-        );
-      } else {
-        // First load or refresh
-        booksQuery = query(
-          booksRef,
-          where("authorId", "==", userId),
-          orderBy("publishedDate", "desc"),
-          limit(this.publishedBooksPagination.pageSize)
-        );
-
-        if (!loadMore) {
-          this.publishedBooks = [];
-          this.publishedBooksPagination.currentPage = 1;
-        }
-      }
-
-      const snapshot = await getDocs(booksQuery);
-
-      if (snapshot.empty && !loadMore) {
-        this.publishedBooks = [];
-        this.publishedBooksPagination.hasNextPage = false;
-        return;
-      }
-
-      const books: Book[] = [];
-      snapshot.forEach((doc) => {
-        const bookData = doc.data() as Book;
-        books.push({
-          ...bookData,
-          id: doc.id,
-        });
-      });
-
-      // Update pagination
-      this.publishedBooksPagination.lastVisible =
-        snapshot.docs[snapshot.docs.length - 1];
-      this.publishedBooksPagination.hasNextPage =
-        books.length === this.publishedBooksPagination.pageSize;
-      this.publishedBooksPagination.hasPreviousPage =
-        this.publishedBooksPagination.currentPage > 1;
-
-      if (loadMore) {
-        this.publishedBooks = [...this.publishedBooks, ...books];
-        this.publishedBooksPagination.currentPage += 1;
-      } else {
-        this.publishedBooks = books;
-      }
-    } catch (error) {
-      this.error = handleError(error).message;
-    } finally {
-      this.loading = false;
-    }
-  }
-
-  /**
    * Publishes a new book to Firestore
    * @param book Book data to publish (without ID)
    * @returns The ID of the newly created book, or null if failed
@@ -235,6 +157,9 @@ export class AuthorState {
     try {
       this.loading = true;
       this.error = null;
+
+      // Optimistic UI update
+      this.totalPublishedBooks++;
 
       const booksRef = collection(db, "books");
 
@@ -250,12 +175,11 @@ export class AuthorState {
       // Add document to Firestore - the ID will be automatically generated
       // and not stored within the document itself
       const docRef = await addDoc(booksRef, bookData);
-
-      // Refresh published books
-      await this.fetchPublishedBooks();
-
+      this.searchResults.push(bookData as Book);
       return docRef.id;
     } catch (error) {
+      // Revert optimistic update on error
+      this.totalPublishedBooks--;
       this.error = handleError(error).message;
       return null;
     } finally {
@@ -294,15 +218,21 @@ export class AuthorState {
         return false;
       }
 
+      // Optimistic UI update - remove book from search results
+      this.searchResults = this.searchResults.filter(
+        (book) => book.id !== bookId
+      );
+      this.totalPublishedBooks = Math.max(0, this.totalPublishedBooks - 1);
+
       // Delete the book
       await deleteDoc(bookRef);
-
-      // Refresh search results after deletion
-      this.refreshSearch();
 
       return true;
     } catch (error) {
       this.error = handleError(error).message;
+      // Revert optimistic updates on error
+      this.refreshSearch();
+      this.fetchTotalPublishedBooks();
       return false;
     } finally {
       this.loading = false;
@@ -363,6 +293,16 @@ export class AuthorState {
         return false;
       }
 
+      // Optimistic UI update - update book in search results
+      const bookIndex = this.searchResults.findIndex((b) => b.id === book.id);
+      if (bookIndex !== -1) {
+        this.searchResults = [
+          ...this.searchResults.slice(0, bookIndex),
+          book,
+          ...this.searchResults.slice(bookIndex + 1),
+        ];
+      }
+
       // Update the book with all required fields
       await updateDoc(bookRef, {
         title: book.title,
@@ -377,12 +317,11 @@ export class AuthorState {
         avgRating: book.avgRating,
       });
 
-      // Refresh published books
-      await this.fetchPublishedBooks();
-
       return true;
     } catch (error) {
       this.error = handleError(error).message;
+      // Revert optimistic updates on error
+      this.refreshSearch();
       return false;
     } finally {
       this.loading = false;

@@ -25,8 +25,9 @@ import { handleError } from "$lib/utils/errorHandling";
 import { auth, db } from "$lib/services/firebase";
 import instantsearch from "instantsearch.js";
 import { searchClient } from "$lib/services/typesense";
-import { history } from "instantsearch.js/es/lib/routers";
-
+import type { Timestamp } from "firebase/firestore";
+import { browser } from "$app/environment";
+import type { UserRole } from "$lib/types/user.type";
 /**
  * BookState class that manages all book-related state and operations
  */
@@ -40,13 +41,23 @@ export class BookState {
   // Loading & Errors
   loading = $state<boolean>(false);
   error = $state<string | null>(null);
+  role = $state<UserRole | null>(null);
 
   // Track if search has been initialized
   searchInitialized = $state<boolean>(false);
   search = instantsearch({
     indexName: "books",
     searchClient,
+    future: {
+      preserveSharedStateOnUnmount: true,
+    },
   });
+
+  private readonly FILTER_STORAGE_KEY = "book_filter_state";
+  private readonly SORT_STORAGE_KEY = "book_sort_option";
+
+  // Default sort option
+  private readonly DEFAULT_SORT = "books/sort/publishedDate:desc";
 
   /**
    * Fetches a single book by ID and its user-specific data
@@ -148,6 +159,7 @@ export class BookState {
           genre: book.genre,
           tags: book.tags,
           userId: auth.currentUser.uid,
+          createdAt: serverTimestamp() as Timestamp,
         };
 
         // Save to user's saved books subcollection
@@ -264,18 +276,6 @@ export class BookState {
     }
   }
 
-  // New method to safely start search
-  startSearch() {
-    if (!this.searchInitialized) {
-      try {
-        this.search.start();
-        this.searchInitialized = true;
-      } catch (error) {
-        console.error("Error starting search:", error);
-      }
-    }
-  }
-
   // Method to safely dispose search
   disposeSearch() {
     if (this.searchInitialized) {
@@ -285,6 +285,163 @@ export class BookState {
       } catch (error) {
         console.error("Error disposing search:", error);
       }
+    }
+  }
+
+  analyticsMiddleware = () => {
+    return {
+      onStateChange() {
+        if (browser) {
+          import("firebase/analytics").then(
+            ({ getAnalytics, logEvent, setCurrentScreen }) => {
+              const analytics = getAnalytics();
+              const currentPath = (
+                window.location.pathname + window.location.search
+              ).toLowerCase();
+
+              setCurrentScreen(analytics, currentPath);
+              logEvent(analytics, "page_view", {
+                page_path: currentPath,
+              });
+            }
+          );
+        }
+      },
+      subscribe() {},
+      unsubscribe() {},
+    };
+  };
+
+  /**
+   * Saves the current search state to localStorage
+   */
+  saveSearchState() {
+    if (!browser) return;
+
+    try {
+      // Save filter state
+      const uiState = this.search.getUiState();
+      const currentState = uiState.books || {};
+
+      if (Object.keys(currentState).length > 0) {
+        localStorage.setItem(
+          this.FILTER_STORAGE_KEY,
+          JSON.stringify(currentState)
+        );
+      }
+
+      // Save sort option
+      const currentIndex = this.search.helper?.state?.index;
+      if (currentIndex) {
+        localStorage.setItem(this.SORT_STORAGE_KEY, currentIndex);
+      }
+    } catch (error) {
+      console.error("Error saving search state to localStorage:", error);
+    }
+  }
+
+  /**
+   * Gets the saved sort option from localStorage
+   * @returns The saved sort option or the default value
+   */
+  getSavedSortOption(): string {
+    if (!browser) return this.DEFAULT_SORT;
+
+    try {
+      const savedSort = localStorage.getItem(this.SORT_STORAGE_KEY);
+      return savedSort || this.DEFAULT_SORT;
+    } catch (error) {
+      console.error("Error getting sort option from localStorage:", error);
+      return this.DEFAULT_SORT;
+    }
+  }
+
+  /**
+   * Loads saved search state (filters and sort) from localStorage
+   */
+  loadSavedSearchState() {
+    if (!browser || !this.searchInitialized) return;
+
+    try {
+      // Restore filters
+      const savedState = localStorage.getItem(this.FILTER_STORAGE_KEY);
+      if (savedState) {
+        const parsedState = JSON.parse(savedState);
+        this.search.setUiState({ books: parsedState });
+      }
+
+      // Restore sort option
+      const savedSort = localStorage.getItem(this.SORT_STORAGE_KEY);
+      if (savedSort) {
+        this.search.helper?.setIndex(savedSort).search();
+      }
+    } catch (error) {
+      console.error("Error loading search state from localStorage:", error);
+    }
+  }
+
+  /**
+   * Sets the sort option and saves it to localStorage
+   * @param sortOption The sort option to set
+   */
+  setSortOption(sortOption: string) {
+    if (!browser || !this.searchInitialized) return;
+
+    try {
+      this.search.helper?.setIndex(sortOption).search();
+      localStorage.setItem(this.SORT_STORAGE_KEY, sortOption);
+    } catch (error) {
+      console.error("Error setting sort option:", error);
+    }
+  }
+
+  // Update the startSearch method
+  startSearch() {
+    if (!this.searchInitialized) {
+      try {
+        // Check for saved sort option before starting the search
+        if (browser) {
+          const savedSort = this.getSavedSortOption();
+          this.search.helper?.setIndex(savedSort);
+        }
+
+        this.search.start();
+        this.searchInitialized = true;
+      } catch (error) {
+        console.error("Error starting search:", error);
+      }
+    }
+  }
+
+  // Create the middleware for saving state
+  createStateMiddleware() {
+    return () => {
+      return {
+        onStateChange: () => {
+          this.saveSearchState();
+        },
+        subscribe() {},
+        unsubscribe() {},
+      };
+    };
+  }
+
+  /**
+   * Fetches the current user's role from Firebase Auth claims
+   * @returns The user's role or null if not authenticated
+   */
+  async getRole() {
+    if (!auth.currentUser) {
+      this.error = "User not authenticated";
+      return null;
+    }
+
+    try {
+      const idTokenResult = await auth.currentUser.getIdTokenResult();
+      this.role = idTokenResult.claims.role as UserRole;
+    } catch (error) {
+      this.error = handleError(error).message;
+      return null;
     }
   }
 }

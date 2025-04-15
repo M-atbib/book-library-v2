@@ -4,7 +4,8 @@
 
   const bookState = getBookState();
 
-  let selectedSort = "books/sort/publishedDate:desc"; // default
+  // Initialize with value from BookState
+  let selectedSort = $state(bookState.getSavedSortOption());
 
   const sortOptions = [
     { value: "books/sort/publishedDate:desc", label: "Newest" },
@@ -12,16 +13,27 @@
     { value: "books/sort/avgRating:desc", label: "Top Rated" },
   ];
 
-  // If you're using InstantSearch.js sortBy widget or custom routing, sync here:
   onMount(() => {
+    // Check if the InstantSearch state has a different index set
     const currentIndex = bookState.search.helper?.state?.index;
-    if (currentIndex) selectedSort = currentIndex;
+
+    if (currentIndex && currentIndex !== selectedSort) {
+      selectedSort = currentIndex;
+    } else if (
+      selectedSort &&
+      (!currentIndex || currentIndex !== selectedSort)
+    ) {
+      // Apply our selected sort if it's different from the helper state
+      bookState.setSortOption(selectedSort);
+    }
   });
 
   function handleSortChange(event: Event) {
     const target = event.target as HTMLSelectElement;
     selectedSort = target.value;
-    bookState.search.helper?.setIndex(target.value).search(); // Update the index
+
+    // Use the centralized method to update and save the sort option
+    bookState.setSortOption(selectedSort);
   }
 </script>
 

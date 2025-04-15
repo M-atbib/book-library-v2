@@ -1,3 +1,5 @@
+import type { Timestamp } from "firebase/firestore";
+
 /**
  * Book Interface
  *
@@ -45,6 +47,7 @@ export interface SavedBook {
   genre: string; // Primary genre of the book
   tags: string[]; // Array of tags/categories associated with the book
   userId: string; // ID of the user who saved the book
+  createdAt: Timestamp; // Date when the book was saved
 }
 
 /**

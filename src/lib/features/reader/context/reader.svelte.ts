@@ -17,43 +17,19 @@ import {
 import { handleError } from "$lib/utils/errorHandling";
 import { getContext } from "svelte";
 import { setContext } from "svelte";
-import { searchClient } from "$lib/services/typesense";
+import { searchClientSavedBooks } from "$lib/services/typesense";
 import instantsearch from "instantsearch.js/es/index";
 import { searchBox, configure } from "instantsearch.js/es/widgets";
 import { connectHits, connectPagination } from "instantsearch.js/es/connectors";
 
 /**
- * Pagination state interface for book listings
- */
-interface Pagination {
-  currentPage: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  lastVisible: any;
-  pageSize: number;
-}
-
-/**
  * ReaderState class that manages all reader-related state and operations
  */
 export class ReaderState {
-  savedBooks = $state<SavedBook[]>([]);
-  loading = $state<boolean>(false);
-  error = $state<string | null>(null);
-  savedBooksPagination = $state<Pagination>({
-    currentPage: 1,
-    totalPages: 0,
-    hasNextPage: false,
-    hasPreviousPage: false,
-    lastVisible: null,
-    pageSize: 10,
-  });
-
   // Search state
   searchInstance = instantsearch({
     indexName: "savedBooks",
-    searchClient,
+    searchClient: searchClientSavedBooks,
     future: {
       preserveSharedStateOnUnmount: true,
     },
@@ -62,31 +38,35 @@ export class ReaderState {
   currentPage = $state(1);
   totalPages = $state(0);
   refineFunction: ((page: number) => void) | null = null;
+  totalSavedBooks = $state(0);
+  loading = $state<boolean>(false);
+  error = $state<string | null>(null);
 
   /**
-   * Fetches saved books for the current user with pagination support
-   * @param loadMore Whether to load more books or refresh the list
+   * Fetches saved books from Firestore
+   * @param updateLoadingState - Whether to update the loading state (default: true)
    */
-  async fetchSavedBooks() {
+  async fetchSavedBooks(updateLoadingState = true) {
     if (!auth.currentUser) {
       this.error = "User not authenticated";
       return;
     }
 
     try {
-      this.loading = true;
-      this.error = null;
+      if (updateLoadingState) {
+        this.loading = true;
+      }
 
       const userId = auth.currentUser.uid;
       const savedBooksRef = collection(db, `users/${userId}/savedBooks`);
       const snapshot = await getCountFromServer(savedBooksRef);
-
-      return snapshot.data().count;
+      this.totalSavedBooks = snapshot.data().count;
     } catch (error) {
       this.error = handleError(error).message;
-      return 0;
     } finally {
-      this.loading = false;
+      if (updateLoadingState) {
+        this.loading = false;
+      }
     }
   }
 
@@ -101,28 +81,24 @@ export class ReaderState {
       return false;
     }
 
-    try {
-      this.loading = true;
-      this.error = null;
+    this.searchResults = this.searchResults.filter(
+      (book) => book.id !== bookId
+    );
+    this.totalSavedBooks = Math.max(0, this.totalSavedBooks - 1);
 
+    try {
       const userId = auth.currentUser.uid;
       const savedBookRef = doc(db, `users/${userId}/savedBooks`, bookId);
 
-      // Delete the document from the savedBooks subcollection
       await deleteDoc(savedBookRef);
-
-      // Update the local state by removing the book
-      this.savedBooks = this.savedBooks.filter((book) => book.id !== bookId);
-
-      // Refresh search results after removal
-      this.refreshSearch();
 
       return true;
     } catch (error) {
       this.error = handleError(error).message;
+
+      await this.fetchSavedBooks();
+
       return false;
-    } finally {
-      this.loading = false;
     }
   }
 

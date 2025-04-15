@@ -222,17 +222,19 @@
       </div>
 
       <!-- Published Date -->
-      <div class="form-control">
-        <label class="label-text mb-2" for="publishedDate">Published Date</label
-        >
-        <input
-          type="date"
-          id="publishedDate"
-          class="input input-bordered w-full"
-          bind:value={book.publishedDate}
-          required
-        />
-      </div>
+      {#if !isEditing}
+        <div class="form-control">
+          <label class="label-text mb-2" for="publishedDate">Published Date</label
+          >
+          <input
+            type="date"
+            id="publishedDate"
+            class="input input-bordered w-full"
+            bind:value={book.publishedDate}
+            required
+          />
+        </div>
+      {/if}
 
       <!-- Description -->
       <div class="form-control">
